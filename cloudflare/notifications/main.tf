@@ -26,6 +26,13 @@ resource "cloudflare_notification_policy_webhooks" "slack" {
   account_id = local.account_id
   name       = "slack-swg-alerts"
   url        = var.slack_webhook_url
+
+  # Cloudflare returns the URL without its secret last part, so it never
+  # matches the configured one. To change the webhook, run
+  # `terraform apply -replace='cloudflare_notification_policy_webhooks.slack[0]'`.
+  lifecycle {
+    ignore_changes = [url]
+  }
 }
 
 # A Rainbow or Pages pool, or one of its origins, changes health.
