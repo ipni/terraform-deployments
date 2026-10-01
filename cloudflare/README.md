@@ -219,8 +219,10 @@ must still match. A direct push to `main` applies nothing.
    Actions → workflow permissions read-only; secret scanning and push
    protection on.
 5. **`production` environment** (Settings → Environments): required reviewers
-   TakGN, byo, nymd (the code owners); deployment branches: protected branches
-   only. The apply role in `bootstrap/github-actions` trusts only jobs in this
+   TakGN, byo, nymd (the code owners, same list as `.github/CODEOWNERS`);
+   self-review allowed (a code owner may approve a deployment of their own
+   merge); "Allow administrators to bypass" off, so only the code owners can
+   release a deployment; deployment branches: protected branches only. The apply role in `bootstrap/github-actions` trusts only jobs in this
    environment.
 
 ## Re-exporting
