@@ -1,7 +1,40 @@
-# Keeps the SHA-pinned actions up to date.
+# Proposes only minor and patch updates (bug and security fixes) for the
+# SHA-pinned actions and the Terraform providers. Major upgrades are left out:
+# do them by hand when we choose to, after reading their release notes.
+#
+# Dependabot PRs run without the repo's secrets or OIDC, so their Terraform
+# plans fail. To plan one, push a commit to its branch yourself (e.g.
+# `git commit --allow-empty -m "Plan"`), which re-runs CI as you.
 version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: monthly
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: terraform
+    directories:
+      - /cloudflare/load-balancing
+      - /cloudflare/inbrowser.link
+      - /cloudflare/inbrowser.dev
+      - /cloudflare/notifications
+      - /cloudflare/modules/swg-zone
+      - /bootstrap/github-actions
+      - /bootstrap/state-backend
+    schedule:
+      interval: monthly
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      # One PR per provider, so every stack moves to the same version together.
+      cloudflare:
+        patterns: ["cloudflare/cloudflare"]
+      aws:
+        patterns: ["hashicorp/aws"]
