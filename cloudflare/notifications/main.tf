@@ -26,6 +26,13 @@ resource "cloudflare_notification_policy_webhooks" "slack" {
   account_id = local.account_id
   name       = "slack-swg-alerts"
   url        = var.slack_webhook_url
+
+  # Cloudflare returns the URL without its secret last part, so it never
+  # matches the configured one. To change the webhook, run
+  # `terraform apply -replace='cloudflare_notification_policy_webhooks.slack[0]'`.
+  lifecycle {
+    ignore_changes = [url]
+  }
 }
 
 # A Rainbow or Pages pool, or one of its origins, changes health.
@@ -57,22 +64,6 @@ resource "cloudflare_notification_policy" "pages_deployment_failed" {
     project_id  = [local.pages_project_uuid]
     environment = ["ENVIRONMENT_PRODUCTION", "ENVIRONMENT_PREVIEW"]
     event       = ["EVENT_DEPLOYMENT_FAILED"]
-  }
-
-  mechanisms = local.mechanisms
-}
-
-# Origin 5xx error rate on either zone drops availability below the SLO.
-resource "cloudflare_notification_policy" "origin_error_rate" {
-  account_id  = local.account_id
-  name        = "SWG origin 5xx error rate"
-  description = "inbrowser.link and inbrowser.dev"
-  alert_type  = "http_alert_origin_error"
-  enabled     = true
-
-  filters = {
-    zones = local.zone_ids
-    slo   = ["99.5"]
   }
 
   mechanisms = local.mechanisms

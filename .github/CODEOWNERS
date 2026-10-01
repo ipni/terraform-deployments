@@ -1,3 +1,3 @@
-# Every change needs a review from one of these (branch protection on main
-# requires a code owner review). Keep in sync with TERRAFORM_APPROVERS.
+# Asked for review on every PR. Reviews are optional (merging is the
+# approval); keep in sync with TERRAFORM_APPROVERS.
 * @TakGN @byo @nymd
