@@ -75,9 +75,13 @@ inputs in each `main.tf`.
 | Alert | Fires when |
 |---|---|
 | SWG load balancer pool health | A Rainbow or Pages pool, or one of its origins, goes unhealthy or recovers |
-| SWG origin 5xx error rate | Origin 5xx errors push either zone below 99.5% availability |
 | SWG traffic anomalies | Traffic on either zone spikes or drops unusually |
 | SWG Pages deployment failed | A production or staging deployment of `ipfs-service-worker-gateway` fails |
+
+There is no origin 5xx error rate alert (`http_alert_origin_error`): Cloudflare
+rejected `slo = ["99.5"]` with error 17007 (its thresholds are fixed per
+sensitivity level). To add it back, create it in the dashboard, read its filters
+from the API and import it.
 
 The health check (`modules/swg-zone/health_checks.tf`) requests
 `https://<cid>.ipfs.<zone>/` with a browser user agent and expects the Service
