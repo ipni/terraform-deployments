@@ -62,22 +62,6 @@ resource "cloudflare_notification_policy" "pages_deployment_failed" {
   mechanisms = local.mechanisms
 }
 
-# Origin 5xx error rate on either zone drops availability below the SLO.
-resource "cloudflare_notification_policy" "origin_error_rate" {
-  account_id  = local.account_id
-  name        = "SWG origin 5xx error rate"
-  description = "inbrowser.link and inbrowser.dev"
-  alert_type  = "http_alert_origin_error"
-  enabled     = true
-
-  filters = {
-    zones = local.zone_ids
-    slo   = ["99.5"]
-  }
-
-  mechanisms = local.mechanisms
-}
-
 # Unusual spike or drop in traffic on either zone.
 resource "cloudflare_notification_policy" "traffic_anomalies" {
   account_id  = local.account_id
