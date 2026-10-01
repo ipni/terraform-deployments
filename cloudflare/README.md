@@ -98,10 +98,11 @@ have applied them (its plan needs their IDs).
 `.github/workflows/terraform-cloudflare.yml`. **Merging a PR is the approval.**
 
 1. **Pull request**: plans each affected stack and posts the full plan as a PR
-   comment. Review it like code; the `plan` checks must pass.
-2. **Merge to main**: the merged PR must be approved, on its last commit, by
-   someone in the `TERRAFORM_APPROVERS` repo variable other than its author.
-   Then, for each affected stack, in the order `load-balancing`,
+   comment. Read it before merging; the `Terraform plan` check must pass. No
+   review is required (small team): you can merge your own PR, or turn on
+   auto-merge and it merges once the checks pass.
+2. **Merge to main**: whoever merged the PR (or turned on its auto-merge) must
+   be in the `TERRAFORM_APPROVERS` repo variable. Then, for each affected stack, in the order `load-balancing`,
    `inbrowser.link`, `inbrowser.dev`, `notifications`: plan again, compare with
    the plan last posted on the merged PR, and apply only if they are the same.
 3. **If the plans differ** (most often a dashboard change after the PR was
@@ -116,10 +117,10 @@ Why this cannot overwrite state: every plan and apply holds the S3 state lock,
 so runs (and laptops) queue instead of writing at the same time, and only
 workflow runs on `main` can assume the AWS role that writes state.
 
-`main` is protected (PR, code owner review, no force pushes), and the workflow
-checks the rules again itself: only a merged PR applies, it needs an approval
-from `TERRAFORM_APPROVERS` on its last commit, and its plan must still match.
-A direct push to `main` applies nothing.
+`main` is protected (PR with passing `Terraform plan` and `gitleaks` checks,
+no force pushes), and the workflow checks the rules again itself: only a merged
+PR applies, it must be merged by someone in `TERRAFORM_APPROVERS`, and its plan
+must still match. A direct push to `main` applies nothing.
 
 ### Public repo safeguards
 
@@ -155,8 +156,8 @@ A direct push to `main` applies nothing.
      (Slack incoming webhook), `RAINBOW_ORIGINS` and `SWG_ALERT_EMAILS`
      (one-line JSON, the same values as in `ipni/infra/terraform-values/`)
 4. **Repository security settings**: branch protection on `main` (require a PR,
-   1 approval, code owner review, dismiss stale approvals, no force pushes or
-   deletion); Actions → require approval for all outside contributors;
+   no review, required checks `Terraform plan` and `gitleaks`, no force pushes
+   or deletion); allow auto-merge; Actions → require approval for all outside contributors;
    Actions → workflow permissions read-only; secret scanning and push
    protection on.
 

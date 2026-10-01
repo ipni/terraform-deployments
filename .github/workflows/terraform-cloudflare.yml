@@ -1,10 +1,10 @@
 # Plan on the PR, apply on merge, for the Cloudflare stacks in cloudflare/.
 #
 # - Pull request: plan every affected stack and post the plan on the PR.
-#   Merging the PR approves that plan. The PR must be approved, on its last
-#   commit, by someone in the TERRAFORM_APPROVERS repo variable other than its
-#   author. Branch protection asks for the same; the workflow checks it again
-#   so a bypassed or misconfigured rule never applies anything.
+#   Merging the PR approves that plan: no review is needed (small team), but
+#   only someone in the TERRAFORM_APPROVERS repo variable can merge for it to
+#   apply, by hand or with auto-merge. The "Terraform plan" check sums up the
+#   plans; branch protection requires it, so auto-merge waits for it.
 # - Push to main (the merge): for each affected stack, in STACK_ORDER, plan
 #   again and apply only if the plan is the same as the one last posted on the
 #   merged PR. If it differs (e.g. someone changed Cloudflare in the dashboard
@@ -20,10 +20,9 @@
 name: Terraform (Cloudflare)
 
 on:
+  # Every PR, so the required "Terraform plan" check always reports; the
+  # changes job picks the stacks to plan (none for unrelated PRs).
   pull_request:
-    paths:
-      - cloudflare/**
-      - .github/workflows/terraform-cloudflare.yml
   push:
     branches: [main]
     paths:
@@ -176,6 +175,25 @@ jobs:
             if (old) await github.rest.issues.updateComment({ ...context.repo, comment_id: old.id, body });
             else await github.rest.issues.createComment({ ...context.repo, issue_number: context.issue.number, body });
 
+  # The one check branch protection requires: all affected stacks planned.
+  plan-result:
+    name: Terraform plan
+    needs: [changes, plan]
+    if: always() && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          CHANGES: ${{ needs.changes.result }}
+          PLAN: ${{ needs.plan.result }}
+          STACKS: ${{ needs.changes.outputs.stacks }}
+        run: |
+          set -euo pipefail
+          [[ "$CHANGES" == success ]] || { echo "::error::Picking the stacks failed."; exit 1; }
+          if [[ "$STACKS" == '[]' ]]; then echo "No stacks affected."; exit 0; fi
+          # Skipped with stacks to plan means a fork PR: no secrets, no plan.
+          [[ "$PLAN" == success ]] || { echo "::error::Plan $PLAN for $STACKS."; exit 1; }
+          echo "Planned: $STACKS"
+
   apply:
     needs: changes
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.stacks != '[]'
@@ -205,7 +223,7 @@ jobs:
           role-to-assume: ${{ vars.AWS_ROLE_TERRAFORM_CLOUDFLARE_APPLY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Find the merged PR, check its approval and its last plan
+      - name: Find the merged PR, check who merged it and its last plan
         id: pr
         env:
           TERRAFORM_APPROVERS: ${{ vars.TERRAFORM_APPROVERS }}
@@ -216,20 +234,16 @@ jobs:
             echo "::error::$GITHUB_SHA is not a merged PR. Changes to cloudflare/ must go through a PR."
             exit 1
           fi
-          number=$(jq -r .number <<<"$pr"); head=$(jq -r .head.sha <<<"$pr"); author=$(jq -r .user.login <<<"$pr")
+          number=$(jq -r .number <<<"$pr"); head=$(jq -r .head.sha <<<"$pr")
 
-          # Approved on the last commit by an approver who is not the author.
-          approvers=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$number/reviews" --jq '.[] | [.user.login, .state, .commit_id] | @tsv' |
-            awk -F'\t' -v head="$head" '$2 != "COMMENTED" { last[$1] = $2 "\t" $3 } END { for (u in last) { split(last[u], a, "\t"); if (a[1] == "APPROVED" && a[2] == head) print u } }')
-          ok=""
-          for u in $approvers; do
-            if [[ "$u" != "$author" && " $TERRAFORM_APPROVERS " == *" $u "* ]]; then ok="$u"; fi
-          done
-          if [[ -z "$ok" ]]; then
-            echo "::error::PR #$number has no approval on its last commit (${head:0:7}) from one of: $TERRAFORM_APPROVERS (other than the author, $author). Nothing applied."
+          # Merging is the approval: the merger (who enabled auto-merge, for an
+          # auto-merged PR) must be an approver. The author may merge their own.
+          merger=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$number" --jq '.merged_by.login // empty')
+          if [[ -z "$merger" || " $TERRAFORM_APPROVERS " != *" $merger "* ]]; then
+            echo "::error::PR #$number was merged by '${merger:-unknown}', who is not one of: $TERRAFORM_APPROVERS. Nothing applied."
             exit 1
           fi
-          echo "Approved by $ok"
+          echo "Merged by $merger"
 
           run=$(gh run list --workflow terraform-cloudflare.yml --event pull_request --commit "$head" --status success --limit 1 --json databaseId --jq '.[0].databaseId // empty')
           if [[ -z "$run" ]]; then
