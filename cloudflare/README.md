@@ -1,0 +1,171 @@
+# Cloudflare
+
+Terraform for IPNI-owned config in the shared Cloudflare account
+*IPFS Public Utilities*. Each folder is its own stack with its own state.
+
+| Folder | What |
+|---|---|
+| `inbrowser.link/` | Production [Service Worker Gateway](https://github.com/ipfs/service-worker-gateway) zone, plus the Pages project it shares with staging |
+| `inbrowser.dev/` | Staging Service Worker Gateway zone |
+| `load-balancing/` | Account-level load balancer pools and health monitors used by both zones |
+| `notifications/` | Cloudflare Notifications (alerts) for the gateway, sent to Slack and email |
+| `modules/swg-zone/` | Shared zone config: DNS, zone settings, rulesets, load balancers, Pages custom domain, health check |
+| `scripts/export.sh` | Read-only export of a live zone into `scripts/generated/` (git-ignored) |
+
+## Not managed here
+
+- **Site content and snippets.** The `ipfs/service-worker-gateway` repo deploys
+  the Pages site (`wrangler pages deploy`) and the Cloudflare Snippets with their
+  rules (`.github/scripts/deploy-snippets.sh`).
+- **Other load balancer monitors and pools in the account** (needle, someguy,
+  p2p-forge, ...). They belong to other services.
+- **Cloudflare-managed rulesets** (OWASP, DDoS, managed WAF).
+
+## Usage
+
+Changes go through GitHub Actions (see [CI](#ci) below): open a PR, review the
+plan it posts, merge to apply. Run only `plan` locally; the state is locked
+while anyone (CI or a laptop) runs, so nobody can overwrite someone else's state.
+
+This repo is public. Values that must stay private (the Rainbow origin
+addresses, alert emails, Slack webhook) are not in it: CI reads them from
+repository secrets, and for local plans you put them in a git-ignored
+`secrets.auto.tfvars` in the stack folder. Copy them from
+`terraform-values/` in the private `ipni/infra` repo. Without them, `plan`
+stops and asks for the missing variables instead of planning a deletion.
+
+```sh
+export CLOUDFLARE_API_TOKEN=$(security find-generic-password -s cloudflare-api-token -w)
+eval "$(aws configure export-credentials --format env)"   # S3 backend needs plain credentials
+cd inbrowser.link   # or inbrowser.dev, load-balancing, notifications
+terraform init
+terraform plan
+```
+
+State lives in `s3://ipni-terraform-state/cloudflare/<stack>/terraform.tfstate`
+(bucket created by `bootstrap/state-backend`).
+
+After adding or upgrading a provider, record its checksums for every platform,
+or CI (Linux, `init -lockfile=readonly`) fails:
+
+```sh
+terraform providers lock -platform=linux_amd64 -platform=linux_arm64 -platform=darwin_arm64 -platform=darwin_amd64
+```
+
+## Load balancing
+
+`load-balancing/` manages the pools `ovh-bhs-rainbow`, `ovh-eri-rainbow`,
+`pages-production`, `pages-staging` and their monitors (`Rainbow HTTP monitor`,
+`pages-prod`, `pages-staging`). The zone stacks read the pool IDs from its
+`pool_ids` output through `terraform_remote_state`, so apply it before the zones
+when adding or replacing a pool.
+
+The Rainbow pools and their monitor are shared with ipfs.io, dweb.link,
+trustless-gateway.link and others. Changes here affect all of them, and
+dashboard edits made for those services show up here as drift.
+
+Try changes on `inbrowser.dev` first. Differences between the zones are the
+inputs in each `main.tf`.
+
+## Alerts
+
+`notifications/` sends these to Slack #ipni-alerts and to `alert_emails` (the
+`SWG_ALERT_EMAILS` secret):
+
+| Alert | Fires when |
+|---|---|
+| SWG load balancer pool health | A Rainbow or Pages pool, or one of its origins, goes unhealthy or recovers |
+| SWG origin 5xx error rate | Origin 5xx errors push either zone below 99.5% availability |
+| SWG traffic anomalies | Traffic on either zone spikes or drops unusually |
+| SWG Pages deployment failed | A production or staging deployment of `ipfs-service-worker-gateway` fails |
+
+The health check (`modules/swg-zone/health_checks.tf`) requests
+`https://<cid>.ipfs.<zone>/` with a browser user agent and expects the Service
+Worker Gateway bootstrap page. The gateway never fetches the CID server-side, so
+it proves the gateway (DNS, load balancer, Snippets, origin) is up, not that the
+content is retrievable.
+
+The Slack webhook URL is a secret: CI reads it from `SWG_ALERTS_SLACK_WEBHOOK_URL`;
+locally, `export TF_VAR_slack_webhook_url=...` before planning `notifications`,
+or the plan will remove the Slack destination.
+
+`notifications/` reads the pool IDs from the load-balancing state. An alert on
+the `swg-ipfs-subdomain` health checks is added in a follow-up PR once the zones
+have applied them (its plan needs their IDs).
+
+## CI
+
+`.github/workflows/terraform-cloudflare.yml`. **Merging a PR is the approval.**
+
+1. **Pull request**: plans each affected stack and posts the full plan as a PR
+   comment. Review it like code; the `plan` checks must pass.
+2. **Merge to main**: the merged PR must be approved, on its last commit, by
+   someone in the `TERRAFORM_APPROVERS` repo variable other than its author.
+   Then, for each affected stack, in the order `load-balancing`,
+   `inbrowser.link`, `inbrowser.dev`, `notifications`: plan again, compare with
+   the plan last posted on the merged PR, and apply only if they are the same.
+3. **If the plans differ** (most often a dashboard change after the PR was
+   planned), that stack and the ones after it are not applied and the run fails
+   with the diff. Sync the change into the code in a new PR (see the drift
+   steps under Load balancing) and merge it.
+
+A manual run (Actions → Terraform (Cloudflare) → Run workflow) only plans, e.g.
+to check for drift. Nothing applies except a merge.
+
+Why this cannot overwrite state: every plan and apply holds the S3 state lock,
+so runs (and laptops) queue instead of writing at the same time, and only
+workflow runs on `main` can assume the AWS role that writes state.
+
+`main` is protected (PR, code owner review, no force pushes), and the workflow
+checks the rules again itself: only a merged PR applies, it needs an approval
+from `TERRAFORM_APPROVERS` on its last commit, and its plan must still match.
+A direct push to `main` applies nothing.
+
+### Public repo safeguards
+
+- No secrets or private values in the code; `Secret scan` (gitleaks) fails any
+  PR or push that adds one, and GitHub push protection blocks it earlier.
+- Pull requests from forks get no secrets and no OIDC token, and their plan is
+  skipped. To take an outside change, re-open it from a branch in this repo
+  after reading it: a plan runs PR code with the read-only token.
+- Sensitive variables are `sensitive = true`, so plans, PR comments and logs
+  show `(sensitive value)` instead of them.
+- Actions are pinned to commit SHAs; Dependabot proposes updates.
+
+### One-time setup
+
+1. **AWS roles** (someone with IAM rights):
+   ```sh
+   eval "$(aws configure export-credentials --format env)"
+   cd bootstrap/github-actions && terraform init && terraform apply
+   ```
+2. **Cloudflare API tokens** (dashboard → My Profile → API Tokens), scoped to the
+   *IPFS Public Utilities* account and the `inbrowser.link` / `inbrowser.dev` zones:
+   - read-only for plans: Account Load Balancing: Monitors and Pools, Notifications,
+     Cloudflare Pages; Zone, DNS, Load Balancers, Health Checks, Zone Settings,
+     Zone WAF, Cache Rules, Config Rules, SSL and Certificates: **Read**
+   - the same permissions with **Edit** for applies
+3. **Repository settings** (Settings → Secrets and variables → Actions):
+   - variables `AWS_ROLE_TERRAFORM_CLOUDFLARE_PLAN` and
+     `AWS_ROLE_TERRAFORM_CLOUDFLARE_APPLY`: the role ARNs output in step 1
+   - variable `TERRAFORM_APPROVERS`: who can approve applies, space separated
+     (`TakGN byo nymd`)
+   - secrets `CLOUDFLARE_API_TOKEN_READ` (read-only token),
+     `CLOUDFLARE_API_TOKEN` (edit token), `SWG_ALERTS_SLACK_WEBHOOK_URL`
+     (Slack incoming webhook), `RAINBOW_ORIGINS` and `SWG_ALERT_EMAILS`
+     (one-line JSON, the same values as in `ipni/infra/terraform-values/`)
+4. **Repository security settings**: branch protection on `main` (require a PR,
+   1 approval, code owner review, dismiss stale approvals, no force pushes or
+   deletion); Actions → require approval for all outside contributors;
+   Actions → workflow permissions read-only; secret scanning and push
+   protection on.
+
+## Re-exporting
+
+```sh
+scripts/export.sh -z inbrowser.dev
+```
+
+Compare `scripts/generated/<zone>/` with the stack to spot changes made in the
+dashboard. Check exported cache rules by hand: `cf-terraforming` writes
+`query_string.exclude = null` where the live rule has `exclude = { all = true }`.

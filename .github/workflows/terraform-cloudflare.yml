@@ -1,0 +1,277 @@
+# Plan on the PR, apply on merge, for the Cloudflare stacks in cloudflare/.
+#
+# - Pull request: plan every affected stack and post the plan on the PR.
+#   Merging the PR approves that plan. The PR must be approved, on its last
+#   commit, by someone in the TERRAFORM_APPROVERS repo variable other than its
+#   author. Branch protection asks for the same; the workflow checks it again
+#   so a bypassed or misconfigured rule never applies anything.
+# - Push to main (the merge): for each affected stack, in STACK_ORDER, plan
+#   again and apply only if the plan is the same as the one last posted on the
+#   merged PR. If it differs (e.g. someone changed Cloudflare in the dashboard
+#   after the PR was planned), nothing more is applied: sync the drift in a PR.
+# - Manual run (Actions tab): plan only. Merging is the only way to apply.
+#
+# State safety: every plan and apply holds the S3 state lock, so two runs (or a
+# run and a laptop) never write the same state at once; only main can assume
+# the AWS role that writes state.
+#
+# Public repo: pull requests from forks get no secrets and no OIDC token, so
+# their plan is skipped; a maintainer re-opens the change from a branch here.
+name: Terraform (Cloudflare)
+
+on:
+  pull_request:
+    paths:
+      - cloudflare/**
+      - .github/workflows/terraform-cloudflare.yml
+  push:
+    branches: [main]
+    paths:
+      - cloudflare/**
+      - .github/workflows/terraform-cloudflare.yml
+  workflow_dispatch:
+    inputs:
+      stacks:
+        description: "Stacks to plan, space separated (or 'all'). Plan only."
+        default: all
+        required: true
+
+permissions:
+  contents: read
+
+# On a PR, a new push cancels the old plan. Runs on main are never cancelled
+# (each applies its own merge); the state lock serialises them.
+concurrency:
+  group: terraform-cloudflare-${{ github.event_name == 'pull_request' && github.head_ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  TF_VERSION: 1.13.5
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+  AWS_REGION: us-east-2
+  # Apply order: zones read pool IDs from load-balancing, notifications reads
+  # health check IDs from the zones.
+  STACK_ORDER: load-balancing inbrowser.link inbrowser.dev notifications
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      stacks: ${{ steps.pick.outputs.stacks }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: pick
+        env:
+          EVENT: ${{ github.event_name }}
+          INPUT_STACKS: ${{ inputs.stacks }}
+          BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT" == workflow_dispatch ]]; then
+            [[ "$INPUT_STACKS" == all ]] && wanted="$STACK_ORDER" || wanted="$INPUT_STACKS"
+          elif [[ -z "$BASE" || "$BASE" == 0000000000000000000000000000000000000000 ]]; then
+            wanted="$STACK_ORDER"
+          else
+            files=$(git diff --name-only "$BASE" "$GITHUB_SHA")
+            wanted=""
+            if grep -q '^\.github/workflows/terraform-cloudflare\.yml$' <<<"$files"; then wanted="$STACK_ORDER"; fi
+            if grep -q '^cloudflare/modules/' <<<"$files"; then wanted+=" inbrowser.link inbrowser.dev"; fi
+            for s in $STACK_ORDER; do
+              if grep -q "^cloudflare/$s/" <<<"$files"; then wanted+=" $s"; fi
+            done
+          fi
+          # Keep STACK_ORDER order, drop duplicates and unknown names.
+          stacks=$(for s in $STACK_ORDER; do if [[ " $wanted " == *" $s "* ]]; then echo "$s"; fi; done | jq -Rsc 'split("\n") | map(select(length > 0))')
+          echo "stacks=$stacks" >> "$GITHUB_OUTPUT"
+          echo "Stacks: $stacks"
+
+  plan:
+    needs: changes
+    if: >-
+      github.event_name != 'push' && needs.changes.outputs.stacks != '[]' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    strategy:
+      fail-fast: false
+      matrix:
+        stack: ${{ fromJSON(needs.changes.outputs.stacks) }}
+    defaults:
+      run:
+        working-directory: cloudflare/${{ matrix.stack }}
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_READ }}
+      TF_VAR_slack_webhook_url: ${{ secrets.SWG_ALERTS_SLACK_WEBHOOK_URL }}
+      TF_VAR_rainbow_origins: ${{ secrets.RAINBOW_ORIGINS }}
+      TF_VAR_alert_emails: ${{ secrets.SWG_ALERT_EMAILS }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_TERRAFORM_CLOUDFLARE_PLAN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - run: terraform fmt -check -recursive ..
+      - run: terraform init -lockfile=readonly
+      - run: terraform validate
+
+      - name: terraform plan
+        id: plan
+        run: |
+          set +e
+          terraform plan -lock-timeout=10m -detailed-exitcode -out=tfplan > plan.log 2>&1
+          code=$?
+          set -e
+          cat plan.log
+          echo "exitcode=$code" >> "$GITHUB_OUTPUT"
+          [[ $code -eq 1 ]] && exit 1
+          terraform show -no-color tfplan > plan.txt
+          ../../.github/scripts/terraform-plan-changes.sh tfplan > changes.txt
+          {
+            echo "### \`${{ matrix.stack }}\`"
+            if [[ $code -eq 0 ]]; then echo "No changes."; else echo '```'; cat changes.txt; grep -E '^Plan:' plan.txt || true; echo '```'; fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # The merge compares its own plan with this one before applying.
+      - name: Upload plan summary
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: plan-changes-${{ matrix.stack }}
+          path: cloudflare/${{ matrix.stack }}/changes.txt
+          retention-days: 30
+
+      - name: Comment plan on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        env:
+          STACK: ${{ matrix.stack }}
+          EXITCODE: ${{ steps.plan.outputs.exitcode }}
+          PLAN_DIR: cloudflare/${{ matrix.stack }}
+        with:
+          script: |
+            const fs = require('fs');
+            const { STACK, EXITCODE, PLAN_DIR } = process.env;
+            const marker = `<!-- terraform-cloudflare-plan:${STACK} -->`;
+            let plan = fs.readFileSync(`${PLAN_DIR}/plan.txt`, 'utf8');
+            if (plan.length > 60000) plan = plan.slice(0, 60000) + '\n... (truncated, see the run log)';
+            const summary = EXITCODE === '0' ? 'No changes' : (plan.match(/^Plan: .*$/m) || ['Changes to outputs only'])[0];
+            const run = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = `${marker}\n#### Terraform plan: \`${STACK}\`: ${summary}\n\nApplied on merge if the plan is still the same.\n\n<details><summary>Show plan</summary>\n\n\`\`\`\n${plan}\n\`\`\`\n</details>\n\n[Run](${run}) · commit ${context.payload.pull_request.head.sha.slice(0, 7)}`;
+            const { data: comments } = await github.rest.issues.listComments({ ...context.repo, issue_number: context.issue.number, per_page: 100 });
+            const old = comments.find(c => c.body.startsWith(marker));
+            if (old) await github.rest.issues.updateComment({ ...context.repo, comment_id: old.id, body });
+            else await github.rest.issues.createComment({ ...context.repo, issue_number: context.issue.number, body });
+
+  apply:
+    needs: changes
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.stacks != '[]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+      actions: read
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      TF_VAR_slack_webhook_url: ${{ secrets.SWG_ALERTS_SLACK_WEBHOOK_URL }}
+      TF_VAR_rainbow_origins: ${{ secrets.RAINBOW_ORIGINS }}
+      TF_VAR_alert_emails: ${{ secrets.SWG_ALERT_EMAILS }}
+      GH_TOKEN: ${{ github.token }}
+      STACKS: ${{ needs.changes.outputs.stacks }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_TERRAFORM_CLOUDFLARE_APPLY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Find the merged PR, check its approval and its last plan
+        id: pr
+        env:
+          TERRAFORM_APPROVERS: ${{ vars.TERRAFORM_APPROVERS }}
+        run: |
+          set -euo pipefail
+          pr=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" --jq '[.[] | select(.merged_at != null)][0]')
+          if [[ -z "$pr" || "$pr" == null ]]; then
+            echo "::error::$GITHUB_SHA is not a merged PR. Changes to cloudflare/ must go through a PR."
+            exit 1
+          fi
+          number=$(jq -r .number <<<"$pr"); head=$(jq -r .head.sha <<<"$pr"); author=$(jq -r .user.login <<<"$pr")
+
+          # Approved on the last commit by an approver who is not the author.
+          approvers=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$number/reviews" --jq '.[] | [.user.login, .state, .commit_id] | @tsv' |
+            awk -F'\t' -v head="$head" '$2 != "COMMENTED" { last[$1] = $2 "\t" $3 } END { for (u in last) { split(last[u], a, "\t"); if (a[1] == "APPROVED" && a[2] == head) print u } }')
+          ok=""
+          for u in $approvers; do
+            if [[ "$u" != "$author" && " $TERRAFORM_APPROVERS " == *" $u "* ]]; then ok="$u"; fi
+          done
+          if [[ -z "$ok" ]]; then
+            echo "::error::PR #$number has no approval on its last commit (${head:0:7}) from one of: $TERRAFORM_APPROVERS (other than the author, $author). Nothing applied."
+            exit 1
+          fi
+          echo "Approved by $ok"
+
+          run=$(gh run list --workflow terraform-cloudflare.yml --event pull_request --commit "$head" --status success --limit 1 --json databaseId --jq '.[0].databaseId // empty')
+          if [[ -z "$run" ]]; then
+            echo "::error::No successful plan on PR #$number for its last commit ${head:0:7}. Nothing applied."
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/pr-plans"
+          gh run download "$run" --pattern 'plan-changes-*' --dir "$RUNNER_TEMP/pr-plans"
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+          echo "PR #$number, plan run $run"
+
+      - name: Plan, compare with the PR, apply
+        env:
+          PR_PLANS: ${{ runner.temp }}/pr-plans
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        run: |
+          set -euo pipefail
+          for stack in $(jq -r '.[]' <<<"$STACKS"); do
+            echo "::group::$stack"
+            cd "$GITHUB_WORKSPACE/cloudflare/$stack"
+            terraform init -lockfile=readonly
+            set +e
+            terraform plan -lock-timeout=10m -detailed-exitcode -out=tfplan
+            code=$?
+            set -e
+            [[ $code -eq 1 ]] && { echo "::error::$stack: plan failed"; exit 1; }
+            "$GITHUB_WORKSPACE/.github/scripts/terraform-plan-changes.sh" tfplan > changes.txt
+            reviewed="$PR_PLANS/plan-changes-$stack/changes.txt"
+            if [[ ! -f "$reviewed" ]]; then
+              echo "::error::$stack: no plan for this stack on PR #$PR_NUMBER. Nothing more applied."
+              exit 1
+            fi
+            if ! diff -u "$reviewed" changes.txt; then
+              echo "::error::$stack: the plan differs from the one on PR #$PR_NUMBER (diff above), e.g. a dashboard change since the PR was planned. Nothing more applied: sync it in a PR."
+              exit 1
+            fi
+            if [[ $code -eq 0 ]]; then
+              echo "$stack: no changes"
+              echo "### \`$stack\`: no changes" >> "$GITHUB_STEP_SUMMARY"
+            else
+              terraform apply -lock-timeout=10m tfplan
+              { echo "### \`$stack\`: applied"; echo '```'; cat changes.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+            fi
+            echo "::endgroup::"
+          done

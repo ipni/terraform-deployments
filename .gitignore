@@ -1,0 +1,24 @@
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# cf-terraforming raw output (review before committing as .tf)
+**/generated/
+
+# macOS
+.DS_Store
+
+# Private values (origins, emails, webhook) for local plans. Never commit them.
+*.auto.tfvars
+*.auto.tfvars.json
+terraform.tfvars
