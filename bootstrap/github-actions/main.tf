@@ -10,7 +10,7 @@
 # get no OIDC token, so they cannot assume either role.
 
 terraform {
-  required_version = ">= 1.10"
+  required_version = ">= 1.16"
 
   required_providers {
     aws = {

@@ -36,7 +36,7 @@ stops and asks for the missing variables instead of planning a deletion.
 
 ```sh
 export CLOUDFLARE_API_TOKEN=$(security find-generic-password -s cloudflare-api-token -w)
-eval "$(aws configure export-credentials --format env)"   # S3 backend needs plain credentials
+aws login   # Terraform >= 1.16 (required) reads the login session directly
 cd inbrowser.link   # or inbrowser.dev, load-balancing, notifications
 terraform init
 terraform plan
@@ -141,7 +141,6 @@ must still match. A direct push to `main` applies nothing.
 
 1. **AWS roles** (someone with IAM rights):
    ```sh
-   eval "$(aws configure export-credentials --format env)"
    cd bootstrap/github-actions && terraform init && terraform apply
    ```
 2. **Cloudflare API tokens** (dashboard → My Profile → API Tokens), scoped to the
