@@ -5,9 +5,11 @@
 #   only someone in the TERRAFORM_APPROVERS repo variable can merge for it to
 #   apply, by hand or with auto-merge. The "Terraform plan" check sums up the
 #   plans; branch protection requires it, so auto-merge waits for it.
-# - Push to main (the merge): for each affected stack, in STACK_ORDER, plan
-#   again and apply only if the plan is the same as the one last posted on the
-#   merged PR. If it differs (e.g. someone changed Cloudflare in the dashboard
+# - Push to main (the merge): the apply job waits in the "production"
+#   environment until one of its required reviewers (the code owners) approves
+#   the deployment in the Actions tab. Then, for each affected stack, in
+#   STACK_ORDER, plan again and apply only if the plan is the same as the one
+#   last posted on the merged PR. If it differs (e.g. someone changed Cloudflare in the dashboard
 #   after the PR was planned), nothing more is applied: sync the drift in a PR.
 # - Manual run (Actions tab): plan only. Merging is the only way to apply.
 # - Nightly: plan every stack; if anything differs from the code (someone
@@ -224,6 +226,9 @@ jobs:
     needs: changes
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.stacks != '[]'
     runs-on: ubuntu-latest
+    # Waits for a required reviewer (a code owner) to approve the deployment.
+    # The AWS apply role only trusts jobs in this environment.
+    environment: production
     permissions:
       contents: read
       id-token: write

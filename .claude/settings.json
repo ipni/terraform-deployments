@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "deny": [
+      "Bash(gh api *pending_deployments*)",
+      "Bash(gh api *deployment_protection_rule*)",
+      "Bash(gh api *environments*)",
+      "Bash(gh api *branches/*/protection*)",
+      "Bash(gh api *rulesets*)",
+      "Bash(gh api *actions/permissions*)",
+      "Bash(gh variable set *)",
+      "Bash(gh variable delete *)",
+      "Bash(gh secret set *)",
+      "Bash(gh secret delete *)",
+      "Bash(curl *api.github.com*pending_deployments*)",
+      "Bash(curl *api.github.com*environments*)",
+      "Bash(terraform apply *)",
+      "Bash(terraform destroy *)",
+      "Bash(terraform import *)",
+      "Bash(terraform state *)",
+      "Bash(terraform force-unlock *)",
+      "Edit(.github/CODEOWNERS)",
+      "Edit(.claude/settings.json)"
+    ]
+  }
+}
