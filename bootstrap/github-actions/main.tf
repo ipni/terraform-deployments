@@ -25,7 +25,10 @@ provider "aws" {
 }
 
 locals {
-  repo         = "ipni/terraform-deployments"
+  # GitHub's immutable OIDC subject for ipni/terraform-deployments:
+  # owner@owner_id/repo@repo_id, so a renamed or re-created repo with the same
+  # name never matches. IDs from `gh api repos/ipni/terraform-deployments`.
+  repo         = "ipni@115147265/terraform-deployments@1400567172"
   state_bucket = "arn:aws:s3:::ipni-terraform-state"
   state_prefix = "cloudflare/"
 }
