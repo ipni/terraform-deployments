@@ -5,7 +5,7 @@
 # so no DynamoDB table is needed.
 
 terraform {
-  required_version = ">= 1.10"
+  required_version = ">= 1.16"
 
   required_providers {
     aws = {

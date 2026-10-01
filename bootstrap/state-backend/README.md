@@ -10,9 +10,8 @@ terraform apply
 This stack starts with local state. After the bucket exists, add a `backend "s3"`
 block (key `bootstrap/state-backend/terraform.tfstate`) and run
 `terraform init -migrate-state` so its own state lives in the bucket too (done:
-see `backend.tf`). If you sign in with `aws login`, first run
-`eval "$(aws configure export-credentials --format env)"`: the S3 backend
-does not read login sessions.
+see `backend.tf`). Terraform 1.16 (required) reads `aws login` sessions
+directly.
 
 Every other stack uses:
 
