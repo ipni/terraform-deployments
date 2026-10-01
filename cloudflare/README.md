@@ -147,8 +147,10 @@ must still match. A direct push to `main` applies nothing.
      Zone WAF, Cache Rules, Config Rules, SSL and Certificates: **Read**
    - the same permissions with **Edit** for applies
 3. **Repository settings** (Settings → Secrets and variables → Actions):
-   - variables `AWS_ROLE_TERRAFORM_CLOUDFLARE_PLAN` and
+   - secrets `AWS_ROLE_TERRAFORM_CLOUDFLARE_PLAN` and
      `AWS_ROLE_TERRAFORM_CLOUDFLARE_APPLY`: the role ARNs output in step 1
+     (not secret, but stored as secrets so the account ID stays out of the
+     public logs)
    - variable `TERRAFORM_APPROVERS`: who can approve applies, space separated
      (`TakGN byo nymd`)
    - secrets `CLOUDFLARE_API_TOKEN_READ` (read-only token),
