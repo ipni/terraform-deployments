@@ -95,7 +95,8 @@ terraform providers lock -platform=linux_amd64 -platform=linux_arm64 -platform=d
    be in the `TERRAFORM_APPROVERS` repo variable.
 3. The apply job then waits in the `production` environment until a code
    owner (TakGN, byo or nymd) approves the deployment. Agents never approve
-   it (see Hard rules).
+   it (see Hard rules). If every plan on the PR said "No changes", the apply
+   is skipped and nothing waits for approval.
 4. Once approved, CI plans again and applies only if the plan matches the one
    on the PR. If not (usually a dashboard edit), it stops: sync the drift into
    the code in a new PR. Never work around the check.

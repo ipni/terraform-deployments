@@ -159,7 +159,10 @@ have applied them (its plan needs their IDs).
    environment. A code owner (TakGN, byo or nymd; they get a GitHub
    notification) opens the run, checks the plan, and clicks *Review
    deployments → Approve*. Nothing reaches Cloudflare until then; AI agents
-   working in this repo never approve it. Then, for each affected stack, in the order `load-balancing`,
+   working in this repo never approve it. If every plan on the PR said "No
+   changes", the apply is skipped and there is nothing to approve (a dashboard
+   change made since the PR was planned is then caught by the nightly drift
+   check). Then, for each affected stack, in the order `load-balancing`,
    `inbrowser.link`, `inbrowser.dev`, `notifications`: plan again, compare with
    the plan last posted on the merged PR, and apply only if they are the same.
 4. **If the plans differ** (most often a dashboard change after the PR was
