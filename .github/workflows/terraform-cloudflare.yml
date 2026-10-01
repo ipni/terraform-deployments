@@ -7,7 +7,8 @@
 #   plans; branch protection requires it, so auto-merge waits for it.
 # - Push to main (the merge): the apply job waits in the "production"
 #   environment until one of its required reviewers (the code owners) approves
-#   the deployment in the Actions tab. Then, for each affected stack, in
+#   the deployment in the Actions tab. If every plan on the merged PR said "No
+#   changes", there is nothing to approve and the apply job is skipped. Then, for each affected stack, in
 #   STACK_ORDER, plan again and apply only if the plan is the same as the one
 #   last posted on the merged PR. If it differs (e.g. someone changed Cloudflare in the dashboard
 #   after the PR was planned), nothing more is applied: sync the drift in a PR.
@@ -222,9 +223,62 @@ jobs:
           [[ "$PLAN" == success ]] || { echo "::error::Plan $PLAN for $STACKS."; exit 1; }
           echo "Planned: $STACKS"
 
-  apply:
+  # Reads the plans posted on the merged PR. If none of them has a change,
+  # the apply job (and its approval request) is skipped. A failure here fails
+  # the run, so a problem is never mistaken for "nothing to apply"; the apply
+  # job still makes all its own checks when it runs.
+  pr-plans:
     needs: changes
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.stacks != '[]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      has_changes: ${{ steps.check.outputs.has_changes }}
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STACKS: ${{ needs.changes.outputs.stacks }}
+        run: |
+          set -euo pipefail
+          pr=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" --jq '[.[] | select(.merged_at != null)][0]')
+          if [[ -z "$pr" || "$pr" == null ]]; then
+            echo "::error::$GITHUB_SHA is not a merged PR. Changes to cloudflare/ must go through a PR."
+            exit 1
+          fi
+          number=$(jq -r .number <<<"$pr"); head=$(jq -r .head.sha <<<"$pr")
+          run=$(gh run list -R "$GITHUB_REPOSITORY" --workflow terraform-cloudflare.yml --event pull_request --commit "$head" --status success --limit 1 --json databaseId --jq '.[0].databaseId // empty')
+          if [[ -z "$run" ]]; then
+            echo "::error::No successful plan on PR #$number for its last commit ${head:0:7}. Nothing applied."
+            exit 1
+          fi
+          dir="$RUNNER_TEMP/pr-plans"
+          gh run download "$run" -R "$GITHUB_REPOSITORY" --pattern 'plan-changes-*' --dir "$dir"
+          has_changes=false
+          for stack in $(jq -r '.[]' <<<"$STACKS"); do
+            f="$dir/plan-changes-$stack/changes.txt"
+            if [[ ! -f "$f" ]]; then
+              echo "$stack: no plan on PR #$number; the apply job will report it."
+              has_changes=true
+            elif [[ -s "$f" ]]; then
+              echo "$stack: changes planned on PR #$number"
+              has_changes=true
+            else
+              echo "$stack: no changes on PR #$number"
+            fi
+          done
+          echo "has_changes=$has_changes" >> "$GITHUB_OUTPUT"
+          if [[ "$has_changes" == false ]]; then
+            echo "Nothing to apply: every plan on PR #$number had no changes. Skipping the apply and its approval." | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
+  apply:
+    needs: [changes, pr-plans]
+    if: >-
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      needs.changes.outputs.stacks != '[]' && needs.pr-plans.outputs.has_changes == 'true'
     runs-on: ubuntu-latest
     # Waits for a required reviewer (a code owner) to approve the deployment.
     # The AWS apply role only trusts jobs in this environment.
