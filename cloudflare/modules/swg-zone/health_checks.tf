@@ -4,7 +4,7 @@
 resource "cloudflare_healthcheck" "subdomain_gateway" {
   zone_id     = var.zone_id
   name        = "swg-ipfs-subdomain"
-  description = "Service Worker Gateway bootstrap on *.ipfs.${var.zone_name}"
+  description = "Service Worker Gateway bootstrap on *.ipfs.${var.zone_name}. ${local.managed_by}"
   address     = "${var.health_check_cid}.ipfs.${var.zone_name}"
   type        = "HTTPS"
 

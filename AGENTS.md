@@ -88,7 +88,11 @@ terraform providers lock -platform=linux_amd64 -platform=linux_arm64 -platform=d
    the code in a new PR. Never work around the check.
 
 In the PR description, say what the plan is expected to show, and explain any
-change you didn't intend.
+change you didn't intend (the PR template asks for it).
+
+Applies are posted to Slack #ipni-alerts, and a nightly scheduled plan posts
+any drift there. Give anything new a "Managed by Terraform" label in its
+description or comment (`local.managed_by`) so it's marked in the dashboard.
 
 ## Known gotchas
 

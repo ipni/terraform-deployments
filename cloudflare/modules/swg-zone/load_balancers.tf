@@ -4,6 +4,7 @@ resource "cloudflare_load_balancer" "gateway" {
 
   zone_id              = var.zone_id
   name                 = "*.${each.key}.${var.zone_name}"
+  description          = local.managed_by
   default_pools        = each.value.pools
   fallback_pool        = each.value.fallback
   enabled              = true

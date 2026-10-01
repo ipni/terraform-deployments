@@ -8,6 +8,10 @@
 locals {
   # Cloudflare account "IPFS Public Utilities" (shared with other IPFS services).
   account_id = "0b45911a8258997976f8efdec3ec84c1"
+
+  # Shown in the dashboard on the pools and monitors owned here (not on the
+  # shared Rainbow ones).
+  managed_by = "Managed by Terraform: github.com/ipni/terraform-deployments"
 }
 
 # --- Monitors ---
@@ -35,7 +39,7 @@ resource "cloudflare_load_balancer_monitor" "rainbow" {
 
 resource "cloudflare_load_balancer_monitor" "pages_production" {
   account_id       = local.account_id
-  description      = "pages-prod"
+  description      = "pages-prod (${local.managed_by})"
   type             = "https"
   method           = "GET"
   path             = "/"
@@ -50,7 +54,7 @@ resource "cloudflare_load_balancer_monitor" "pages_production" {
 
 resource "cloudflare_load_balancer_monitor" "pages_staging" {
   account_id       = local.account_id
-  description      = "pages-staging"
+  description      = "pages-staging (${local.managed_by})"
   type             = "https"
   method           = "GET"
   path             = "/"
@@ -125,6 +129,7 @@ resource "cloudflare_load_balancer_pool" "ovh_eri_rainbow" {
 resource "cloudflare_load_balancer_pool" "pages_production" {
   account_id      = local.account_id
   name            = "pages-production"
+  description     = "Service Worker Gateway on Pages, production. ${local.managed_by}"
   enabled         = true
   minimum_origins = 1
   monitor         = cloudflare_load_balancer_monitor.pages_production.id
@@ -149,6 +154,7 @@ resource "cloudflare_load_balancer_pool" "pages_production" {
 resource "cloudflare_load_balancer_pool" "pages_staging" {
   account_id      = local.account_id
   name            = "pages-staging"
+  description     = "Service Worker Gateway on Pages, staging. ${local.managed_by}"
   enabled         = true
   minimum_origins = 1
   monitor         = cloudflare_load_balancer_monitor.pages_staging.id

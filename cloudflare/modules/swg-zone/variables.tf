@@ -65,17 +65,6 @@ variable "extra_zone_settings" {
   default     = {}
 }
 
-variable "no_email_comments" {
-  description = "Comments on the no-email DNS records, kept as they are in each zone."
-  type = object({
-    mx    = optional(string, "disable mail")
-    spf   = optional(string, "disable mail")
-    dkim  = optional(string, "disable email")
-    dmarc = optional(string, "disable email")
-  })
-  default = {}
-}
-
 variable "noindex_expression" {
   description = "Override for the X-Robots-Tag rule expression (same logic, different clause order in some zones)."
   type        = string

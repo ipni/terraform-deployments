@@ -5,6 +5,7 @@ resource "cloudflare_dns_record" "apex" {
   content = var.pages_target
   proxied = true
   ttl     = 1
+  comment = local.managed_by
   settings = {
     flatten_cname = false
   }
@@ -18,7 +19,7 @@ resource "cloudflare_dns_record" "mx_null" {
   content  = "."
   priority = 0
   ttl      = 1
-  comment  = var.no_email_comments.mx
+  comment  = "No email. ${local.managed_by}"
 }
 
 resource "cloudflare_dns_record" "spf" {
@@ -27,7 +28,7 @@ resource "cloudflare_dns_record" "spf" {
   type    = "TXT"
   content = "\"v=spf1 -all\""
   ttl     = 1
-  comment = var.no_email_comments.spf
+  comment = "No email. ${local.managed_by}"
 }
 
 resource "cloudflare_dns_record" "dkim" {
@@ -36,7 +37,7 @@ resource "cloudflare_dns_record" "dkim" {
   type    = "TXT"
   content = "v=DKIM1; p="
   ttl     = 1
-  comment = var.no_email_comments.dkim
+  comment = "No email. ${local.managed_by}"
 }
 
 resource "cloudflare_dns_record" "dmarc" {
@@ -45,7 +46,7 @@ resource "cloudflare_dns_record" "dmarc" {
   type    = "TXT"
   content = "v=DMARC1;p=reject;sp=reject;adkim=s;aspf=s"
   ttl     = 1
-  comment = var.no_email_comments.dmarc
+  comment = "No email. ${local.managed_by}"
 }
 
 resource "cloudflare_dns_record" "dnslink_build_cid" {
@@ -54,7 +55,7 @@ resource "cloudflare_dns_record" "dnslink_build_cid" {
   type    = "TXT"
   content = "dnslink=/ipfs/${var.dnslink_build_cid.cid}"
   ttl     = 1
-  comment = var.dnslink_build_cid.comment
+  comment = "${var.dnslink_build_cid.comment}. ${local.managed_by}"
 }
 
 # Proof of ownership for the Public Suffix List entry.
@@ -64,4 +65,5 @@ resource "cloudflare_dns_record" "psl" {
   type    = "TXT"
   content = "\"https://github.com/publicsuffix/list/pull/2413\""
   ttl     = 1
+  comment = local.managed_by
 }

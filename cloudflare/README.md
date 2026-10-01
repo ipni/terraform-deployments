@@ -23,9 +23,19 @@ Terraform for IPNI-owned config in the shared Cloudflare account
 
 ## Usage
 
-Changes go through GitHub Actions (see [CI](#ci) below): open a PR, review the
-plan it posts, merge to apply. Run only `plan` locally; the state is locked
-while anyone (CI or a laptop) runs, so nobody can overwrite someone else's state.
+**Don't change these zones, pools or alerts in the Cloudflare dashboard.**
+Everything managed here is labelled "Managed by Terraform" there. A dashboard
+edit is reported to #ipni-alerts by the nightly drift check and blocks the
+next apply until it's synced into the code.
+
+**You don't need any credentials to make a change.** Edit the code on a branch,
+open a PR, read the plan CI posts on it, and merge (or turn on auto-merge).
+Merging applies it, and the result is posted to #ipni-alerts. See
+[Common changes](#common-changes) below.
+
+Planning locally is optional. Only ever run `plan` locally; the state is
+locked while anyone (CI or a laptop) runs, so nobody can overwrite someone
+else's state.
 
 This repo is public. Values that must stay private (the Rainbow origin
 addresses, alert emails, Slack webhook) are not in it: CI reads them from
@@ -51,6 +61,44 @@ or CI (Linux, `init -lockfile=readonly`) fails:
 ```sh
 terraform providers lock -platform=linux_amd64 -platform=linux_arm64 -platform=darwin_arm64 -platform=darwin_amd64
 ```
+
+## Common changes
+
+Try zone changes on `inbrowser.dev` first, then `inbrowser.link`.
+
+- **DNS record, zone setting, rate limit, firewall or cache rule** (both
+  zones): edit `modules/swg-zone/` (`dns.tf`, `zone_settings.tf`,
+  `rulesets.tf`). For one zone only, add or change an input in that zone's
+  `main.tf` (e.g. `rate_limit`, `cache_rules`, `extra_zone_settings`).
+- **Gateway build CID** (`_dnslink.build-cid`): `dnslink_build_cid` in the
+  zone's `main.tf`.
+- **Load balancer pools or their order**: `load_balancers` in the zone's
+  `main.tf`; pools and monitors themselves are in `load-balancing/main.tf`.
+- **Alert**: add a `cloudflare_notification_policy` in `notifications/main.tf`
+  using `local.mechanisms` (Slack + email) and `local.managed_by` in its
+  description. Alert types and filters:
+  `GET /accounts/<account>/alerting/v3/available_alerts`.
+- **Alert recipients**: the `SWG_ALERT_EMAILS` secret (one-line JSON list) and
+  `terraform-values/notifications.auto.tfvars` in the private `ipni/infra`.
+- **Something new**: create it in code. If it already exists in Cloudflare,
+  write the resource and an `import` block with its ID in the same PR; the plan
+  should show the import and no other change. Remove the `import` block in a
+  later PR.
+
+Put "Managed by Terraform" in the description or comment of anything new that
+has one (`local.managed_by`), so it's labelled in the dashboard too.
+
+### When Cloudflare differs from the code (drift)
+
+You'll see it as a :warning: post in #ipni-alerts from the nightly check, or
+as an apply that stopped after a merge. Someone changed Cloudflare outside
+this repo. Then either:
+
+- **keep the change**: update the code to match (use
+  [Re-exporting](#re-exporting) to see the live config), open a PR, and check
+  its plan shows no changes for that resource; or
+- **undo it**: open a PR that touches that stack (a comment is enough). Its
+  plan shows the dashboard change being reverted; merging applies the revert.
 
 ## Load balancing
 
