@@ -11,7 +11,7 @@ resource "cloudflare_ruleset" "rate_limit" {
   name    = "default"
   phase   = "http_ratelimit"
   rules = [{
-    description = "global rate limit"
+    description = "global rate limit (${local.managed_by})"
     enabled     = true
     expression  = "(http.host wildcard r\"*.${var.zone_name}\" and not starts_with(http.request.uri.path, \"/ipfs-sw-\"))"
     action      = "block"
@@ -37,7 +37,7 @@ resource "cloudflare_ruleset" "firewall_custom" {
   name    = "default"
   phase   = "http_request_firewall_custom"
   rules = [{
-    description = "not a browser"
+    description = "not a browser (${local.managed_by})"
     enabled     = true
     expression  = "(not starts_with(http.user_agent, \"Mozilla\"))"
     action      = "block"
@@ -57,7 +57,7 @@ resource "cloudflare_ruleset" "response_headers" {
   name    = "default"
   phase   = "http_response_headers_transform"
   rules = [{
-    description = "X-Robots-Tag: noindex, nofollow"
+    description = "X-Robots-Tag: noindex, nofollow (${local.managed_by})"
     enabled     = true
     expression  = coalesce(var.noindex_expression, "(ends_with(http.host, \".ipfs.${var.zone_name}\")) or (ends_with(http.host, \".ipns.${var.zone_name}\")) or (starts_with(http.request.uri.path, \"/ipfs/\")) or (starts_with(http.request.uri.path, \"/ipns/\"))")
     action      = "rewrite"

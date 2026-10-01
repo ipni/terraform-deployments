@@ -10,6 +10,10 @@
 #   merged PR. If it differs (e.g. someone changed Cloudflare in the dashboard
 #   after the PR was planned), nothing more is applied: sync the drift in a PR.
 # - Manual run (Actions tab): plan only. Merging is the only way to apply.
+# - Nightly: plan every stack; if anything differs from the code (someone
+#   changed Cloudflare outside this repo) or the plan fails, post it to Slack
+#   #ipni-alerts. Silent when everything matches.
+# - Every merge that applies something, or fails to, is posted to #ipni-alerts.
 #
 # State safety: every plan and apply holds the S3 state lock, so two runs (or a
 # run and a laptop) never write the same state at once; only main can assume
@@ -28,6 +32,8 @@ on:
     paths:
       - cloudflare/**
       - .github/workflows/terraform-cloudflare.yml
+  schedule:
+    - cron: "17 6 * * *" # drift check, daily 06:17 UTC
   workflow_dispatch:
     inputs:
       stacks:
@@ -49,8 +55,8 @@ env:
   TF_IN_AUTOMATION: "true"
   TF_INPUT: "false"
   AWS_REGION: us-east-2
-  # Apply order: zones read pool IDs from load-balancing, notifications reads
-  # health check IDs from the zones.
+  # Apply order: the zones and notifications read pool IDs from load-balancing;
+  # notifications goes last so it can also use IDs the zones create.
   STACK_ORDER: load-balancing inbrowser.link inbrowser.dev notifications
 
 jobs:
@@ -145,6 +151,25 @@ jobs:
             if [[ $code -eq 0 ]]; then echo "No changes."; else echo '```'; cat changes.txt; grep -E '^Plan:' plan.txt || true; echo '```'; fi
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Report drift to Slack
+        if: >-
+          always() && github.event_name == 'schedule' &&
+          (steps.plan.outcome == 'failure' || steps.plan.outputs.exitcode == '2')
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SWG_ALERTS_SLACK_WEBHOOK_URL }}
+          STACK: ${{ matrix.stack }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          FAILED: ${{ steps.plan.outcome == 'failure' }}
+        run: |
+          set -euo pipefail
+          if [[ "$FAILED" == true ]]; then
+            printf ':x: *Cloudflare drift check failed* for %s. <%s|Run>\n' "\`$STACK\`" "$RUN_URL"
+          else
+            printf ':warning: *Cloudflare drift* on %s: %s\n' "\`$STACK\`" "$(grep -E '^Plan:' plan.txt || echo 'outputs changed')"
+            printf 'Cloudflare differs from the code, most likely a dashboard change. Sync it into the code in a PR (or revert it in the dashboard). <%s|Plan>\n' "$RUN_URL"
+            awk '{print "• " $1 " `" $2 "`"}' changes.txt
+          fi | ../../.github/scripts/slack-post.sh
+
       # The merge compares its own plan with this one before applying.
       - name: Upload plan summary
         if: github.event_name == 'pull_request'
@@ -237,6 +262,7 @@ jobs:
             exit 1
           fi
           number=$(jq -r .number <<<"$pr"); head=$(jq -r .head.sha <<<"$pr")
+          { echo "number=$number"; echo "title=$(jq -r .title <<<"$pr")"; } >> "$GITHUB_OUTPUT"
 
           # Merging is the approval: the merger (who enabled auto-merge, for an
           # auto-merged PR) must be an approver. The author may merge their own.
@@ -246,6 +272,7 @@ jobs:
             exit 1
           fi
           echo "Merged by $merger"
+          echo "merger=$merger" >> "$GITHUB_OUTPUT"
 
           run=$(gh run list --workflow terraform-cloudflare.yml --event pull_request --commit "$head" --status success --limit 1 --json databaseId --jq '.[0].databaseId // empty')
           if [[ -z "$run" ]]; then
@@ -254,7 +281,6 @@ jobs:
           fi
           mkdir -p "$RUNNER_TEMP/pr-plans"
           gh run download "$run" --pattern 'plan-changes-*' --dir "$RUNNER_TEMP/pr-plans"
-          echo "number=$number" >> "$GITHUB_OUTPUT"
           echo "PR #$number, plan run $run"
 
       - name: Plan, compare with the PR, apply
@@ -263,8 +289,10 @@ jobs:
           PR_NUMBER: ${{ steps.pr.outputs.number }}
         run: |
           set -euo pipefail
+          results="$RUNNER_TEMP/results.txt"
           for stack in $(jq -r '.[]' <<<"$STACKS"); do
             echo "::group::$stack"
+            echo "STACK $stack" >> "$results"
             cd "$GITHUB_WORKSPACE/cloudflare/$stack"
             terraform init -lockfile=readonly
             set +e
@@ -285,9 +313,50 @@ jobs:
             if [[ $code -eq 0 ]]; then
               echo "$stack: no changes"
               echo "### \`$stack\`: no changes" >> "$GITHUB_STEP_SUMMARY"
+              echo "NOCHANGE $stack" >> "$results"
             else
               terraform apply -lock-timeout=10m tfplan
               { echo "### \`$stack\`: applied"; echo '```'; cat changes.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+              { echo "APPLIED $stack"; awk '{print "CHANGE " $1 " " $2}' changes.txt; } >> "$results"
             fi
             echo "::endgroup::"
           done
+
+      # Posts what was applied, or that the apply failed, to #ipni-alerts.
+      # Silent when the merge changed nothing in Cloudflare.
+      - name: Report to Slack
+        if: always()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SWG_ALERTS_SLACK_WEBHOOK_URL }}
+          OUTCOME: ${{ job.status }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          PR_TITLE: ${{ steps.pr.outputs.title }}
+          MERGER: ${{ steps.pr.outputs.merger }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+        run: |
+          set -euo pipefail
+          results="$RUNNER_TEMP/results.txt"
+          touch "$results"
+          if [[ "$OUTCOME" == success ]] && ! grep -q '^APPLIED ' "$results"; then
+            echo "Nothing applied; not posting."; exit 0
+          fi
+          esc() { sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }
+          pr="a push to main"
+          [[ -n "$PR_NUMBER" ]] && pr="<$REPO_URL/pull/$PR_NUMBER|#$PR_NUMBER> $(esc <<<"$PR_TITLE")"
+          by=""; [[ -n "$MERGER" ]] && by=" (merged by $MERGER)"
+          {
+            if [[ "$OUTCOME" == success ]]; then
+              echo ":white_check_mark: *Cloudflare applied* $pr$by"
+            else
+              echo ":x: *Cloudflare apply stopped* on $pr$by. Stacks after the failing one were not applied."
+            fi
+            # A STACK line without APPLIED/NOCHANGE after it is the one that failed.
+            awk -v bt='`' '
+              $1 == "STACK"    { pending = $2 }
+              $1 == "APPLIED"  { print bt $2 bt ": applied"; pending = "" }
+              $1 == "CHANGE"   { print "    • " $2 " " bt $3 bt }
+              $1 == "NOCHANGE" { print bt $2 bt ": no changes"; pending = "" }
+              END { if (pending != "") print bt pending bt ": failed (see the run)" }' "$results"
+            echo "<$RUN_URL|Run>"
+          } | .github/scripts/slack-post.sh

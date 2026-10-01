@@ -71,11 +71,6 @@ module "zone" {
   # Same logic as production, clauses in a different order.
   noindex_expression = "(starts_with(http.request.uri.path, \"/ipfs/\")) or (starts_with(http.request.uri.path, \"/ipns/\")) or (ends_with(http.host, \".ipfs.inbrowser.dev\")) or (ends_with(http.host, \".ipns.inbrowser.dev\"))"
 
-  no_email_comments = {
-    mx    = "no email"
-    spf   = "no email"
-    dmarc = "disbale email"
-  }
 
   extra_zone_settings = {
     proxy_read_timeout = "300"

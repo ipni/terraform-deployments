@@ -9,6 +9,9 @@ locals {
   # ../inbrowser.link/pages.tf). The provider only exposes the name as its id.
   pages_project_uuid = "dc709c2c-4327-4c7c-8588-be09c3dde4de"
 
+  # Shown in the dashboard on every alert.
+  managed_by = "Managed by Terraform: github.com/ipni/terraform-deployments"
+
   zone_ids = [
     "3cf6893c26dde38efa39910a57798a59", # inbrowser.link
     "920073f8f22220ca3a3c514d81195e35", # inbrowser.dev
@@ -39,7 +42,7 @@ resource "cloudflare_notification_policy_webhooks" "slack" {
 resource "cloudflare_notification_policy" "load_balancing_health" {
   account_id  = local.account_id
   name        = "SWG load balancer pool health"
-  description = "Pools behind *.ipfs / *.ipns on inbrowser.link and inbrowser.dev"
+  description = "Pools behind *.ipfs / *.ipns on inbrowser.link and inbrowser.dev. ${local.managed_by}"
   alert_type  = "load_balancing_health_alert"
   enabled     = true
 
@@ -56,7 +59,7 @@ resource "cloudflare_notification_policy" "load_balancing_health" {
 resource "cloudflare_notification_policy" "pages_deployment_failed" {
   account_id  = local.account_id
   name        = "SWG Pages deployment failed"
-  description = "ipfs-service-worker-gateway Pages project"
+  description = "ipfs-service-worker-gateway Pages project. ${local.managed_by}"
   alert_type  = "pages_event_alert"
   enabled     = true
 
@@ -73,7 +76,7 @@ resource "cloudflare_notification_policy" "pages_deployment_failed" {
 resource "cloudflare_notification_policy" "traffic_anomalies" {
   account_id  = local.account_id
   name        = "SWG traffic anomalies"
-  description = "inbrowser.link and inbrowser.dev"
+  description = "inbrowser.link and inbrowser.dev. ${local.managed_by}"
   alert_type  = "traffic_anomalies_alert"
   enabled     = true
 
