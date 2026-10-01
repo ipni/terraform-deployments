@@ -154,10 +154,15 @@ have applied them (its plan needs their IDs).
    review is required (small team): you can merge your own PR, or turn on
    auto-merge and it merges once the checks pass.
 2. **Merge to main**: whoever merged the PR (or turned on its auto-merge) must
-   be in the `TERRAFORM_APPROVERS` repo variable. Then, for each affected stack, in the order `load-balancing`,
+   be in the `TERRAFORM_APPROVERS` repo variable.
+3. **Approve the deployment**: the apply job waits in the `production`
+   environment. A code owner (TakGN, byo or nymd; they get a GitHub
+   notification) opens the run, checks the plan, and clicks *Review
+   deployments → Approve*. Nothing reaches Cloudflare until then; AI agents
+   working in this repo never approve it. Then, for each affected stack, in the order `load-balancing`,
    `inbrowser.link`, `inbrowser.dev`, `notifications`: plan again, compare with
    the plan last posted on the merged PR, and apply only if they are the same.
-3. **If the plans differ** (most often a dashboard change after the PR was
+4. **If the plans differ** (most often a dashboard change after the PR was
    planned), that stack and the ones after it are not applied and the run fails
    with the diff. Sync the change into the code in a new PR (see the drift
    steps under Load balancing) and merge it.
@@ -213,6 +218,10 @@ must still match. A direct push to `main` applies nothing.
    or deletion); allow auto-merge; Actions → require approval for all outside contributors;
    Actions → workflow permissions read-only; secret scanning and push
    protection on.
+5. **`production` environment** (Settings → Environments): required reviewers
+   TakGN, byo, nymd (the code owners); deployment branches: protected branches
+   only. The apply role in `bootstrap/github-actions` trusts only jobs in this
+   environment.
 
 ## Re-exporting
 

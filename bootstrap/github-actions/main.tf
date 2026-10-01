@@ -4,10 +4,12 @@
 #
 # - plan:  pull requests and manual runs on main. Reads state, can only write
 #          the lock file, so it can never change state.
-# - apply: only workflow runs on main (a merged PR). Reads and writes state.
+# - apply: only the apply job, in the "production" environment: a merged PR
+#          on main, after a code owner approved the deployment. Reads and
+#          writes state.
 #
-# Only the main branch can apply. The repo is public: pull requests from forks
-# get no OIDC token, so they cannot assume either role.
+# The repo is public: pull requests from forks get no OIDC token, so they
+# cannot assume either role.
 
 terraform {
   required_version = ">= 1.16"
@@ -76,7 +78,10 @@ data "aws_iam_policy_document" "trust_apply" {
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${local.repo}:ref:refs/heads/main"]
+      # Only the apply job, which runs in the "production" environment: it
+      # needs a code owner to approve the deployment, and the environment only
+      # deploys from main.
+      values = ["repo:${local.repo}:environment:production"]
     }
   }
 }

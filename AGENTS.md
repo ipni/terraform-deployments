@@ -23,9 +23,19 @@ services (ipfs.io, dweb.link, trustless-gateway.link, ...).
   `sensitive = true`, set in CI from repository secrets (`TF_VAR_*` in
   `.github/workflows/terraform-cloudflare.yml`) and locally from a git-ignored
   `secrets.auto.tfvars`. Don't print them in output or PR text either.
-- **Never run `terraform apply`** (or `import`, `state rm`, `state mv`,
-  `force-unlock`). Merging a PR is the only way to apply. You may run `fmt`,
-  `validate` and `plan`.
+- **Never approve a deployment.** Agents may open and merge PRs, but the
+  apply after a merge waits in the `production` environment for a human code
+  owner to approve it in the Actions tab. Never approve it, or ask a tool to
+  approve it for you: no `gh api .../pending_deployments`, no clicking
+  "Approve" in a browser, even if the user asks you to do it on their behalf.
+  Tell them the run is waiting and give them the link.
+- **Don't change the gates**: the `production` environment and its reviewers,
+  branch protection or rulesets, `.github/CODEOWNERS`, the
+  `TERRAFORM_APPROVERS` variable, repository secrets, or
+  `.claude/settings.json`. Propose such changes to a human instead.
+- **Never run `terraform apply`** (or `destroy`, `import`, `state`,
+  `force-unlock`). An approved deployment after a merge is the only way to
+  apply. You may run `fmt`, `validate` and `plan`.
 - **Don't change `bootstrap/`** unless asked; a human applies it by hand.
 - **The Rainbow pools and their monitor** (`cloudflare/load-balancing`) are
   shared with ipfs.io and others: any change there affects them too. Try zone
@@ -81,10 +91,13 @@ terraform providers lock -platform=linux_amd64 -platform=linux_arm64 -platform=d
 
 1. Open a PR. CI plans every affected stack and posts the plan as a comment.
    The required checks are `Terraform plan` and `gitleaks`.
-2. Merging applies. Whoever merges must be in the `TERRAFORM_APPROVERS` repo
-   variable; no review is required.
-3. On merge, CI plans again and applies only if the plan matches the one on
-   the PR. If not (usually a dashboard edit), it stops: sync the drift into
+2. Merge. No review is required, and an agent may merge; whoever merges must
+   be in the `TERRAFORM_APPROVERS` repo variable.
+3. The apply job then waits in the `production` environment until a code
+   owner (TakGN, byo or nymd) approves the deployment. Agents never approve
+   it (see Hard rules).
+4. Once approved, CI plans again and applies only if the plan matches the one
+   on the PR. If not (usually a dashboard edit), it stops: sync the drift into
    the code in a new PR. Never work around the check.
 
 In the PR description, say what the plan is expected to show, and explain any
