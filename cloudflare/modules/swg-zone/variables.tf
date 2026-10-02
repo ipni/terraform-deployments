@@ -75,3 +75,9 @@ variable "health_check_cid" {
   description = "CID probed by the zone health check at https://<cid>.ipfs.<zone>/."
   type        = string
 }
+
+variable "badbits_status_check" {
+  description = "Add the badbits sync health check. One zone is enough: both Workers read the same denylist store."
+  type        = bool
+  default     = false
+}

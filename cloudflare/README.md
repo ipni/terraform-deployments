@@ -137,6 +137,12 @@ Worker Gateway bootstrap page. The gateway never fetches the CID server-side, so
 it proves the gateway (DNS, load balancer, Snippets, origin) is up, not that the
 content is retrievable.
 
+The badbits sync health check (`swg-badbits-sync`, `inbrowser.link` only) requests
+`https://<cid>.ipfs.inbrowser.link/ipfs-sw-badbits-status`, answered by the
+`gateway-edge` Worker from the denylist store's `bb:status`: unhealthy means
+the list hasn't synced for 2h. The edge still blocks the last synced list;
+check the sync job and the list host (`badbits.dwebops.pub`).
+
 The Slack webhook URL is a secret: CI reads it from `SWG_ALERTS_SLACK_WEBHOOK_URL`;
 locally, `export TF_VAR_slack_webhook_url=...` before planning `notifications`,
 or the plan will remove the Slack destination.
