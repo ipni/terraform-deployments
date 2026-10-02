@@ -16,15 +16,17 @@ module "zone" {
   # IPFS gateway-checker test CID.
   health_check_cid = "bafybeifx7yeb55armcsxwwitkymga5xf53dxiarykms3ygqic223w5sk3m"
 
-  # Pages first, Rainbow as failover.
+  # Pages first, Rainbow (Erith) as failover. The fallback, used when every
+  # pool is unhealthy, is Pages: that is more likely a monitor problem than
+  # Pages being down, and Pages serves every hostname.
   load_balancers = {
     ipfs = {
-      pools    = [local.pools.pages_staging, local.pools.ovh_bhs_rainbow, local.pools.ovh_eri_rainbow]
-      fallback = local.pools.ovh_bhs_rainbow
+      pools    = [local.pools.pages_staging, local.pools.ovh_eri_rainbow]
+      fallback = local.pools.pages_staging
     }
     ipns = {
-      pools    = [local.pools.pages_staging, local.pools.ovh_bhs_rainbow, local.pools.ovh_eri_rainbow]
-      fallback = local.pools.ovh_bhs_rainbow
+      pools    = [local.pools.pages_staging, local.pools.ovh_eri_rainbow]
+      fallback = local.pools.pages_staging
     }
   }
 
