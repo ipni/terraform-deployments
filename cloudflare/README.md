@@ -125,6 +125,31 @@ inputs in each `main.tf`.
 | SWG load balancer pool health | A Rainbow or Pages pool, or one of its origins, goes unhealthy or recovers |
 | SWG traffic anomalies | Traffic on either zone spikes or drops unusually |
 | SWG Pages deployment failed | A production or staging deployment of `ipfs-service-worker-gateway` fails |
+| SWG health check | The `swg-ipfs-subdomain` health check on either zone fails or recovers |
+
+### Paging
+
+One alert pages the on-call person through PagerDuty instead of Slack:
+**SWG production down (page)**, raised when the `inbrowser.link` health check
+goes unhealthy. That covers the gateway being down for users, including every
+production pool being down at once (the load balancer then has nowhere to send
+the check). A single pool or origin going down doesn't page: the load balancer
+fails over, and the Slack alert is enough.
+
+Only the Unhealthy event is sent, because each event opens a PagerDuty
+incident. Recovery shows in Slack; resolve the incident in PagerDuty.
+
+The PagerDuty destination is connected once in the dashboard (Notifications >
+Destinations > PagerDuty > Connect, choosing the PagerDuty service), because
+the provider can't create it. Its ID goes in the `CLOUDFLARE_PAGERDUTY_ID`
+repository variable:
+
+```sh
+curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+  https://api.cloudflare.com/client/v4/accounts/<account>/alerting/v3/destinations/pagerduty | jq '.result'
+```
+
+While the variable is empty, the paging alert isn't created.
 
 There is no origin 5xx error rate alert (`http_alert_origin_error`): Cloudflare
 rejected `slo = ["99.5"]` with error 17007 (its thresholds are fixed per
@@ -147,9 +172,8 @@ The Slack webhook URL is a secret: CI reads it from `SWG_ALERTS_SLACK_WEBHOOK_UR
 locally, `export TF_VAR_slack_webhook_url=...` before planning `notifications`,
 or the plan will remove the Slack destination.
 
-`notifications/` reads the pool IDs from the load-balancing state. An alert on
-the `swg-ipfs-subdomain` health checks is added in a follow-up PR once the zones
-have applied them (its plan needs their IDs).
+`notifications/` reads the pool IDs from the load-balancing state and the
+health check IDs from the zone states.
 
 ## CI
 
