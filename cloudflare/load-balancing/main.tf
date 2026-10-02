@@ -50,6 +50,9 @@ resource "cloudflare_load_balancer_monitor" "pages_production" {
   retries          = 2
   follow_redirects = false
   allow_insecure   = false
+  header = {
+    Host = ["ipfs-service-worker-gateway.pages.dev"]
+  }
 }
 
 resource "cloudflare_load_balancer_monitor" "pages_staging" {
