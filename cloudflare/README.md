@@ -123,6 +123,7 @@ inputs in each `main.tf`.
 | Alert | Fires when |
 |---|---|
 | SWG load balancer pool health | A Rainbow or Pages pool, or one of its origins, goes unhealthy or recovers |
+| SWG badbits sync | The badbits denylist hasn't synced for 2h (`swg-badbits-sync` health check on `inbrowser.link`), or syncs again |
 | SWG traffic anomalies | Traffic on either zone spikes or drops unusually |
 | SWG Pages deployment failed | A production or staging deployment of `ipfs-service-worker-gateway` fails |
 | SWG health check | The `swg-ipfs-subdomain` health check on either zone fails or recovers |
