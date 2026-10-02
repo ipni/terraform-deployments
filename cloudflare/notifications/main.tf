@@ -38,7 +38,8 @@ resource "cloudflare_notification_policy_webhooks" "slack" {
   }
 }
 
-# A Rainbow or Pages pool, or one of its origins, changes health.
+# A Pages pool, or its origin, changes health. Only the pools the SWG load
+# balancers use: the Rainbow pools are shared and no longer behind them.
 resource "cloudflare_notification_policy" "load_balancing_health" {
   account_id  = local.account_id
   name        = "SWG load balancer pool health"
@@ -47,7 +48,10 @@ resource "cloudflare_notification_policy" "load_balancing_health" {
   enabled     = true
 
   filters = {
-    pool_id      = values(data.terraform_remote_state.load_balancing.outputs.pool_ids)
+    pool_id = [
+      data.terraform_remote_state.load_balancing.outputs.pool_ids.pages_production,
+      data.terraform_remote_state.load_balancing.outputs.pool_ids.pages_staging,
+    ]
     event_source = ["pool", "origin"]
     new_health   = ["Unhealthy", "Healthy"]
   }
