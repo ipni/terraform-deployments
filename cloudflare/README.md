@@ -178,17 +178,26 @@ health check IDs from the zone states.
 
 ## CI
 
-`.github/workflows/terraform-cloudflare.yml`. **Merging a PR is the approval.**
+`.github/workflows/terraform-cloudflare.yml`:
 
-1. **Pull request**: plans each affected stack and posts the full plan as a PR
-   comment. Read it before merging; the `Terraform plan` check must pass. No
+```
+PR:     gitleaks -> changes -> plan (per stack) -> to-apply
+Merge:  gitleaks -> changes -> to-apply -> apply (waits for a code owner)
+```
+
+1. **Pull request**: scans the PR's commits for secrets (`gitleaks`); only then
+   plans each affected stack and posts the full plan as a PR comment. The
+   `to-apply` job (shown as the `Terraform plan` check) lists every resource
+   the PR would create, update, replace or delete in its summary. Read it
+   before merging; the `Terraform plan` check must pass. No
    review is required (small team): you can merge your own PR, or turn on
    auto-merge and it merges once the checks pass.
 2. **Merge to main**: whoever merged the PR (or turned on its auto-merge) must
    be in the `TERRAFORM_APPROVERS` repo variable.
 3. **Approve the deployment**: the apply job waits in the `production`
    environment. A code owner (TakGN, byo or nymd; they get a GitHub
-   notification) opens the run, checks the plan, and clicks *Review
+   notification) opens the run, reads the `to-apply` job's summary (what the
+   merged PR planned, and what will be applied), and clicks *Review
    deployments → Approve*. Nothing reaches Cloudflare until then; AI agents
    working in this repo never approve it. If every plan on the PR said "No
    changes", the apply is skipped and there is nothing to approve (a dashboard
@@ -215,8 +224,8 @@ must still match. A direct push to `main` applies nothing.
 
 ### Public repo safeguards
 
-- No secrets or private values in the code; `Secret scan` (gitleaks) fails any
-  PR or push that adds one, and GitHub push protection blocks it earlier.
+- No secrets or private values in the code; the `gitleaks` job fails any PR or
+  push that adds one, before anything is planned or applied, and GitHub push protection blocks it earlier.
 - Pull requests from forks get no secrets and no OIDC token, and their plan is
   skipped. To take an outside change, re-open it from a branch in this repo
   after reading it: a plan runs PR code with the read-only token.
