@@ -16,6 +16,9 @@ module "zone" {
   # IPFS gateway-checker test CID.
   health_check_cid = "bafybeifx7yeb55armcsxwwitkymga5xf53dxiarykms3ygqic223w5sk3m"
 
+  # Both zones' Workers share the denylist store, so it's checked here only.
+  badbits_status_check = true
+
   # Pages only, also as the fallback (used when every pool is unhealthy): if
   # its monitor reports it down, that is more likely a monitor problem than
   # Pages being down, and Pages serves every hostname.
