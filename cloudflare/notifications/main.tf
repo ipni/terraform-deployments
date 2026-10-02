@@ -59,6 +59,24 @@ resource "cloudflare_notification_policy" "load_balancing_health" {
   mechanisms = local.mechanisms
 }
 
+# The badbits denylist sync has stopped (swg-badbits-sync health check): the
+# edge still blocks what was last synced, but new entries no longer reach it.
+# Slack only, not user-facing.
+resource "cloudflare_notification_policy" "badbits_sync" {
+  account_id  = local.account_id
+  name        = "SWG badbits sync"
+  description = "swg-badbits-sync on inbrowser.link: denylist not synced for 2h. ${local.managed_by}"
+  alert_type  = "health_check_status_notification"
+  enabled     = true
+
+  filters = {
+    health_check_id = [data.terraform_remote_state.zone["inbrowser.link"].outputs.badbits_health_check_id]
+    status          = ["Unhealthy", "Healthy"]
+  }
+
+  mechanisms = local.mechanisms
+}
+
 # A Pages deployment of the gateway fails (production or staging).
 resource "cloudflare_notification_policy" "pages_deployment_failed" {
   account_id  = local.account_id
