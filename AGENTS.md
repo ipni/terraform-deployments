@@ -89,8 +89,10 @@ terraform providers lock -platform=linux_amd64 -platform=linux_arm64 -platform=d
 
 ## How changes ship
 
-1. Open a PR. CI plans every affected stack and posts the plan as a comment.
-   The required checks are `Terraform plan` and `gitleaks`.
+1. Open a PR. CI scans it for secrets (`gitleaks`), then plans every affected
+   stack and posts the plan as a comment; the `to-apply` job lists what would
+   be applied. The required checks are `Terraform plan` (the `to-apply` job)
+   and `gitleaks`.
 2. Merge. No review is required, and an agent may merge; whoever merges must
    be in the `TERRAFORM_APPROVERS` repo variable.
 3. The apply job then waits in the `production` environment until a code
