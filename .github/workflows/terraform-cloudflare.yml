@@ -119,6 +119,7 @@ jobs:
       TF_VAR_slack_webhook_url: ${{ secrets.SWG_ALERTS_SLACK_WEBHOOK_URL }}
       TF_VAR_rainbow_origins: ${{ secrets.RAINBOW_ORIGINS }}
       TF_VAR_alert_emails: ${{ secrets.SWG_ALERT_EMAILS }}
+      TF_VAR_pagerduty_id: ${{ vars.CLOUDFLARE_PAGERDUTY_ID }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -293,6 +294,7 @@ jobs:
       TF_VAR_slack_webhook_url: ${{ secrets.SWG_ALERTS_SLACK_WEBHOOK_URL }}
       TF_VAR_rainbow_origins: ${{ secrets.RAINBOW_ORIGINS }}
       TF_VAR_alert_emails: ${{ secrets.SWG_ALERT_EMAILS }}
+      TF_VAR_pagerduty_id: ${{ vars.CLOUDFLARE_PAGERDUTY_ID }}
       GH_TOKEN: ${{ github.token }}
       STACKS: ${{ needs.changes.outputs.stacks }}
     steps:

@@ -87,3 +87,42 @@ resource "cloudflare_notification_policy" "traffic_anomalies" {
 
   mechanisms = local.mechanisms
 }
+
+# The end-to-end health check on *.ipfs fails or recovers, on either zone.
+resource "cloudflare_notification_policy" "health_check" {
+  account_id  = local.account_id
+  name        = "SWG health check"
+  description = "swg-ipfs-subdomain on inbrowser.link and inbrowser.dev. ${local.managed_by}"
+  alert_type  = "health_check_status_notification"
+  enabled     = true
+
+  filters = {
+    health_check_id = [for z in data.terraform_remote_state.zone : z.outputs.health_check_id]
+    status          = ["Unhealthy", "Healthy"]
+  }
+
+  mechanisms = local.mechanisms
+}
+
+# Pages the on-call person: inbrowser.link is down for users. This also covers
+# every production pool being down, since the load balancer then has nowhere to
+# send the health check. Unhealthy only: each alert opens a PagerDuty incident,
+# so recoveries stay in Slack (above) and the incident is resolved by hand.
+resource "cloudflare_notification_policy" "production_down_page" {
+  count = var.pagerduty_id == "" ? 0 : 1
+
+  account_id  = local.account_id
+  name        = "SWG production down (page)"
+  description = "swg-ipfs-subdomain on inbrowser.link is unhealthy. ${local.managed_by}"
+  alert_type  = "health_check_status_notification"
+  enabled     = true
+
+  filters = {
+    health_check_id = [data.terraform_remote_state.zone["inbrowser.link"].outputs.health_check_id]
+    status          = ["Unhealthy"]
+  }
+
+  mechanisms = {
+    pagerduty = [{ id = var.pagerduty_id }]
+  }
+}

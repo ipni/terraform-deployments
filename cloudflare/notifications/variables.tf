@@ -10,3 +10,9 @@ variable "slack_webhook_url" {
   default     = ""
   sensitive   = true
 }
+
+variable "pagerduty_id" {
+  description = "ID of the Cloudflare PagerDuty destination (connected once in the dashboard). CI sets TF_VAR_pagerduty_id from the CLOUDFLARE_PAGERDUTY_ID variable. Empty disables paging."
+  type        = string
+  default     = ""
+}
