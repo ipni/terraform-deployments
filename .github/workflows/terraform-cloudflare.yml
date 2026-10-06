@@ -284,12 +284,13 @@ jobs:
             echo "::error::Plan $PLAN for $STACKS."; exit 1
           fi
 
+      # gh, not actions/download-artifact: the action extracts a lone matching
+      # artifact straight into the path, without its plan-changes-<stack>/
+      # folder, so a PR changing one stack showed "no plan". gh always keeps
+      # the folder, the same as the merge step below.
       - name: Download this run's plans
         if: github.event_name == 'pull_request' && needs.changes.outputs.stacks != '[]'
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
-        with:
-          pattern: plan-changes-*
-          path: ${{ runner.temp }}/plans
+        run: gh run download "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY" --pattern 'plan-changes-*' --dir "$RUNNER_TEMP/plans"
 
       - name: Download the merged PR's plans
         id: pr
