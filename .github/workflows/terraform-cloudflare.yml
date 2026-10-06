@@ -345,7 +345,13 @@ jobs:
 
   apply:
     needs: [gitleaks, changes, to-apply]
+    # Without a status function GitHub adds success(), which also checks the
+    # plan job behind to-apply. plan is always skipped on push, so apply was
+    # skipped on every merge. Check the jobs this one needs instead.
     if: >-
+      !cancelled() &&
+      needs.gitleaks.result == 'success' && needs.changes.result == 'success' &&
+      needs.to-apply.result == 'success' &&
       github.event_name == 'push' && github.ref == 'refs/heads/main' &&
       needs.changes.outputs.stacks != '[]' && needs.to-apply.outputs.has_changes == 'true'
     runs-on: ubuntu-latest
