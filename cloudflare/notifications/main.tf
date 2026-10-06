@@ -12,11 +12,6 @@ locals {
   # Shown in the dashboard on every alert.
   managed_by = "Managed by Terraform: github.com/ipni/terraform-deployments"
 
-  zone_ids = [
-    "3cf6893c26dde38efa39910a57798a59", # inbrowser.link
-    "920073f8f22220ca3a3c514d81195e35", # inbrowser.dev
-  ]
-
   mechanisms = {
     email    = [for e in var.alert_emails : { id = e }]
     webhooks = [for w in cloudflare_notification_policy_webhooks.slack : { id = w.id }]
@@ -94,16 +89,20 @@ resource "cloudflare_notification_policy" "pages_deployment_failed" {
   mechanisms = local.mechanisms
 }
 
-# Unusual spike or drop in traffic on either zone.
+# Unusual spike or drop in traffic, production only. Cloudflare's thresholds are
+# fixed (z-score above 3.5 against the last 4h, over 200 requests in 5 min), so
+# inbrowser.dev, at about 50 requests per 5 min, alerted on every small burst
+# (18 times from 2026-09-29 to 2026-10-06, none of them actionable). Staging
+# outages are still caught by the health check and pool health alerts.
 resource "cloudflare_notification_policy" "traffic_anomalies" {
   account_id  = local.account_id
   name        = "SWG traffic anomalies"
-  description = "inbrowser.link and inbrowser.dev. ${local.managed_by}"
+  description = "inbrowser.link. ${local.managed_by}"
   alert_type  = "traffic_anomalies_alert"
   enabled     = true
 
   filters = {
-    zones                     = local.zone_ids
+    zones                     = ["3cf6893c26dde38efa39910a57798a59"] # inbrowser.link
     alert_trigger_preferences = ["zscore_spike_and_drop"]
   }
 
