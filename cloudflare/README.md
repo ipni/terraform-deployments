@@ -40,8 +40,10 @@ else's state.
 This repo is public. Values that must stay private (the Rainbow origin
 addresses, alert emails, Slack webhook) are not in it: CI reads them from
 repository secrets, and for local plans you put them in a git-ignored
-`secrets.auto.tfvars` in the stack folder. Copy them from
-`terraform-values/` in the private `ipni/infra` repo. Without them, `plan`
+`secrets.auto.tfvars` in the stack folder. Secrets cannot be read back, so
+take the Rainbow origins from the load balancer pools in Cloudflare
+(dashboard, or `GET /accounts/<account>/load_balancers/pools`), and the alert
+emails from the recipients of the SWG notification policies. Without them, `plan`
 stops and asks for the missing variables instead of planning a deletion.
 
 ```sh
@@ -78,8 +80,7 @@ Try zone changes on `inbrowser.dev` first, then `inbrowser.link`.
   using `local.mechanisms` (Slack + email) and `local.managed_by` in its
   description. Alert types and filters:
   `GET /accounts/<account>/alerting/v3/available_alerts`.
-- **Alert recipients**: the `SWG_ALERT_EMAILS` secret (one-line JSON list) and
-  `terraform-values/notifications.auto.tfvars` in the private `ipni/infra`.
+- **Alert recipients**: the `SWG_ALERT_EMAILS` secret (one-line JSON list).
 - **Something new**: create it in code. If it already exists in Cloudflare,
   write the resource and an `import` block with its ID in the same PR; the plan
   should show the import and no other change. Remove the `import` block in a
@@ -255,7 +256,7 @@ must still match. A direct push to `main` applies nothing.
    - secrets `CLOUDFLARE_API_TOKEN_READ` (read-only token),
      `CLOUDFLARE_API_TOKEN` (edit token), `SWG_ALERTS_SLACK_WEBHOOK_URL`
      (Slack incoming webhook), `RAINBOW_ORIGINS` and `SWG_ALERT_EMAILS`
-     (one-line JSON, the same values as in `ipni/infra/terraform-values/`)
+     (one-line JSON; see the private values above for where to read them)
 4. **Repository security settings**: branch protection on `main` (require a PR,
    no review, required checks `Terraform plan` and `gitleaks`, no force pushes
    or deletion); allow auto-merge; Actions → require approval for all outside contributors;
