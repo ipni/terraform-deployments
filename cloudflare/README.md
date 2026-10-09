@@ -40,7 +40,8 @@ else's state.
 This repo is public. Values that must stay private (the Rainbow origin
 addresses, alert emails, Slack webhook) are not in it: CI reads them from
 repository secrets. Secrets cannot be read back, so every one of them is also
-kept in 1Password, in the COMPASS vault's Secure Note **"terraform-deployments
+kept in 1Password (IPFS account, `team-ipfs.1password.com`), in the Compass
+vault's Secure Note **"terraform-deployments
 GitHub Actions secrets"**, one field per secret, labelled with the secret's
 name. Change a secret in GitHub and in that note together.
 
@@ -49,7 +50,8 @@ For a local plan, put the stack's values in a git-ignored
 with the 1Password CLI (`brew install 1password-cli`):
 
 ```sh
-note="op://COMPASS/terraform-deployments GitHub Actions secrets"
+export OP_ACCOUNT=team-ipfs.1password.com
+note="op://Compass/terraform-deployments GitHub Actions secrets"
 printf '{"rainbow_origins": %s}\n' "$(op read "$note/RAINBOW_ORIGINS")" \
   > load-balancing/secrets.auto.tfvars.json
 printf '{"alert_emails": %s, "slack_webhook_url": "%s"}\n' \
