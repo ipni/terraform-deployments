@@ -39,12 +39,26 @@ else's state.
 
 This repo is public. Values that must stay private (the Rainbow origin
 addresses, alert emails, Slack webhook) are not in it: CI reads them from
-repository secrets, and for local plans you put them in a git-ignored
-`secrets.auto.tfvars` in the stack folder. Secrets cannot be read back, so
-take the Rainbow origins from the load balancer pools in Cloudflare
-(dashboard, or `GET /accounts/<account>/load_balancers/pools`), and the alert
-emails from the recipients of the SWG notification policies. Without them, `plan`
-stops and asks for the missing variables instead of planning a deletion.
+repository secrets. Secrets cannot be read back, so every one of them is also
+kept in 1Password, in the team vault's Secure Note **"terraform-deployments
+GitHub Actions secrets"**, one field per secret, labelled with the secret's
+name. Change a secret in GitHub and in that note together.
+
+For a local plan, put the stack's values in a git-ignored
+`secrets.auto.tfvars.json` in the stack folder. Copy them from the note, or
+with the 1Password CLI (`brew install 1password-cli`):
+
+```sh
+note="op://<vault>/terraform-deployments GitHub Actions secrets"
+printf '{"rainbow_origins": %s}\n' "$(op read "$note/RAINBOW_ORIGINS")" \
+  > load-balancing/secrets.auto.tfvars.json
+printf '{"alert_emails": %s, "slack_webhook_url": "%s"}\n' \
+  "$(op read "$note/SWG_ALERT_EMAILS")" "$(op read "$note/SWG_ALERTS_SLACK_WEBHOOK_URL")" \
+  > notifications/secrets.auto.tfvars.json
+```
+
+Without them, `plan` stops and asks for the missing variables instead of
+planning a deletion.
 
 ```sh
 export CLOUDFLARE_API_TOKEN=$(security find-generic-password -s cloudflare-api-token -w)
@@ -80,7 +94,8 @@ Try zone changes on `inbrowser.dev` first, then `inbrowser.link`.
   using `local.mechanisms` (Slack + email) and `local.managed_by` in its
   description. Alert types and filters:
   `GET /accounts/<account>/alerting/v3/available_alerts`.
-- **Alert recipients**: the `SWG_ALERT_EMAILS` secret (one-line JSON list).
+- **Alert recipients**: the `SWG_ALERT_EMAILS` secret (one-line JSON list),
+  and its copy in 1Password.
 - **Something new**: create it in code. If it already exists in Cloudflare,
   write the resource and an `import` block with its ID in the same PR; the plan
   should show the import and no other change. Remove the `import` block in a
@@ -256,7 +271,8 @@ must still match. A direct push to `main` applies nothing.
    - secrets `CLOUDFLARE_API_TOKEN_READ` (read-only token),
      `CLOUDFLARE_API_TOKEN` (edit token), `SWG_ALERTS_SLACK_WEBHOOK_URL`
      (Slack incoming webhook), `RAINBOW_ORIGINS` and `SWG_ALERT_EMAILS`
-     (one-line JSON; see the private values above for where to read them)
+     (one-line JSON). Put every secret in the 1Password note too (see the
+     private values above): GitHub cannot show them again
 4. **Repository security settings**: branch protection on `main` (require a PR,
    no review, required checks `Terraform plan` and `gitleaks`, no force pushes
    or deletion); allow auto-merge; Actions → require approval for all outside contributors;
