@@ -23,7 +23,14 @@ locals {
   monitoring_records = {
     "monitoring.ipni.io"        = { proxied = true, what = "Grafana" }
     "argocd.ipni.io"            = { proxied = true, what = "Argo CD" }
-    "ingest.monitoring.ipni.io" = { proxied = false, what = "metrics and logs ingest, reached directly" }
+    "ingest.monitoring.ipni.io" = { proxied = false, what = "ingest (DNS only)" }
+  }
+
+  # Cloudflare rejects DNS record comments over 100 characters on this zone's
+  # plan, and only at apply time; the precondition below fails the plan instead.
+  record_comments = {
+    for name, r in local.monitoring_records :
+    name => "IPNI monitoring, lith-1: ${r.what}. Terraform: github.com/ipni/terraform-deployments"
   }
 
   # The proxied ones: Cloudflare sends them to Traefik on 8443, verified.
@@ -40,7 +47,14 @@ resource "cloudflare_dns_record" "monitoring" {
   content = local.lith1
   proxied = each.value.proxied
   ttl     = 1 # automatic
-  comment = "IPNI monitoring on lith-1: ${each.value.what}. ${local.managed_by}"
+  comment = local.record_comments[each.key]
+
+  lifecycle {
+    precondition {
+      condition     = length(local.record_comments[each.key]) <= 100
+      error_message = "The comment for ${each.key} is ${length(local.record_comments[each.key])} characters; Cloudflare allows 100."
+    }
+  }
 }
 
 # Port 443 on lith-1 is taken, so the proxied hostnames go to 8443. The zone
