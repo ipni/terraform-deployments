@@ -62,8 +62,9 @@ env:
   TF_INPUT: "false"
   AWS_REGION: us-east-2
   # Apply order: the zones and notifications read pool IDs from load-balancing;
-  # notifications goes last so it can also use IDs the zones create.
-  STACK_ORDER: load-balancing inbrowser.link inbrowser.dev notifications
+  # notifications goes last so it can also use IDs the zones create. ipni.io
+  # depends on none of them.
+  STACK_ORDER: load-balancing inbrowser.link inbrowser.dev notifications ipni.io
 
 jobs:
   # Fails a PR or push that adds a secret anywhere in its commits; nothing is
@@ -151,7 +152,8 @@ jobs:
       run:
         working-directory: cloudflare/${{ matrix.stack }}
     env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_READ }}
+      # ipni.io is in another Cloudflare account, with its own tokens.
+      CLOUDFLARE_API_TOKEN: ${{ matrix.stack == 'ipni.io' && secrets.CLOUDFLARE_IPNI_IO_API_TOKEN_READ || secrets.CLOUDFLARE_API_TOKEN_READ }}
       TF_VAR_slack_webhook_url: ${{ secrets.SWG_ALERTS_SLACK_WEBHOOK_URL }}
       TF_VAR_rainbow_origins: ${{ secrets.RAINBOW_ORIGINS }}
       TF_VAR_alert_emails: ${{ secrets.SWG_ALERT_EMAILS }}
@@ -365,6 +367,8 @@ jobs:
       actions: read
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      # For the ipni.io stack, which is in another Cloudflare account.
+      CLOUDFLARE_IPNI_IO_API_TOKEN: ${{ secrets.CLOUDFLARE_IPNI_IO_API_TOKEN }}
       TF_VAR_slack_webhook_url: ${{ secrets.SWG_ALERTS_SLACK_WEBHOOK_URL }}
       TF_VAR_rainbow_origins: ${{ secrets.RAINBOW_ORIGINS }}
       TF_VAR_alert_emails: ${{ secrets.SWG_ALERT_EMAILS }}
@@ -425,7 +429,13 @@ jobs:
         run: |
           set -euo pipefail
           results="$RUNNER_TEMP/results.txt"
+          default_token="$CLOUDFLARE_API_TOKEN"
           for stack in $(jq -r '.[]' <<<"$STACKS"); do
+            if [[ "$stack" == ipni.io ]]; then
+              export CLOUDFLARE_API_TOKEN="$CLOUDFLARE_IPNI_IO_API_TOKEN"
+            else
+              export CLOUDFLARE_API_TOKEN="$default_token"
+            fi
             echo "::group::$stack"
             echo "STACK $stack" >> "$results"
             cd "$GITHUB_WORKSPACE/cloudflare/$stack"
