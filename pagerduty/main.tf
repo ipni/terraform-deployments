@@ -38,9 +38,13 @@ resource "pagerduty_user" "member" {
 
   description = local.managed_by
 
-  # Everyone edits their own profile in PagerDuty.
+  # Everyone edits their own profile in PagerDuty. The description is only set
+  # on users Terraform creates: an API key can't modify the account owner
+  # (403, code 2010), so updating it on the imported owner failed the apply.
+  # The owner's name, email and role can only be changed by the owner, in
+  # PagerDuty.
   lifecycle {
-    ignore_changes = [job_title]
+    ignore_changes = [job_title, description]
   }
 }
 
