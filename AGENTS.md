@@ -10,6 +10,9 @@ Terraform for IPNI infrastructure:
 - `cloudflare/`: the Service Worker Gateway zones (`inbrowser.link` production,
   `inbrowser.dev` staging), their load balancer pools and monitors, and alerts.
   Applied by CI when a PR is merged.
+- `pagerduty/`: PagerDuty on-call (team, members, schedule, escalation
+  policy, services, the indexers' Events API v2 integration). Applied by CI
+  with the Cloudflare stacks, from the same workflow.
 - `bootstrap/`: the S3 state bucket and the IAM roles CI assumes. Applied by
   hand by humans with IAM rights, never by CI.
 
@@ -63,8 +66,12 @@ Each folder under `cloudflare/` is its own stack with its own state in
 3. `notifications`: alerts; reads the pool IDs. It runs last so it can also
    use IDs the zones create (e.g. health checks).
 
+`ipni.io` and `pagerduty` (in `pagerduty/`, state key
+`pagerduty/terraform.tfstate`) depend on none of them and run after.
+
 Adding a stack: add it to `STACK_ORDER`, keep its state key under
-`cloudflare/` (the CI roles can only reach that prefix), and add its README row.
+`cloudflare/` or `pagerduty/` (the only prefixes the CI roles can reach), and
+add its README row.
 
 ## Commands
 

@@ -5,6 +5,7 @@ Terraform for infrastructure run by the IPNI team.
 | Folder | What |
 |---|---|
 | [`cloudflare/`](cloudflare/README.md) | Service Worker Gateway zones (`inbrowser.link`, `inbrowser.dev`), load balancing and alerts, applied by CI on merge |
+| [`pagerduty/`](pagerduty/README.md) | PagerDuty on-call: team, schedule, escalation policy, services, applied by CI on merge |
 | `bootstrap/` | One-time stacks applied by hand: the S3 state bucket and the IAM roles CI assumes |
 
 Changes go through pull requests, and you don't need any credentials: CI

@@ -25,6 +25,7 @@ updates:
       - /cloudflare/inbrowser.dev
       - /cloudflare/notifications
       - /cloudflare/modules/swg-zone
+      - /pagerduty
       - /bootstrap/github-actions
       - /bootstrap/state-backend
     schedule:
@@ -38,3 +39,5 @@ updates:
         patterns: ["cloudflare/cloudflare"]
       aws:
         patterns: ["hashicorp/aws"]
+      pagerduty:
+        patterns: ["PagerDuty/pagerduty"]
