@@ -77,6 +77,13 @@ resource "pagerduty_schedulev2" "on_call" {
   time_zone   = "Etc/UTC"
   teams       = [pagerduty_team.ipni.id]
 
+  # PagerDuty stores Etc/UTC as "UTC", which the provider rejects as a value,
+  # so every plan wanted to change it back. To change the time zone, remove
+  # this, apply, and put it back.
+  lifecycle {
+    ignore_changes = [time_zone]
+  }
+
   rotation {
     event {
       name            = "Weekly"
