@@ -154,20 +154,20 @@ inputs in each `main.tf`.
 
 ### Paging
 
-Every SWG alert except traffic anomalies also pages the on-call person,
-through the PagerDuty service **Service Worker Gateway**
-([pagerduty/](../pagerduty/README.md)). Production only, and for the bad event
-only; Slack and email still get everything, staging and recoveries included.
+Production outages also page the on-call person, through the PagerDuty
+service **Service Worker Gateway** ([pagerduty/](../pagerduty/README.md)).
+Production only, and for the bad event only; Slack and email still get
+everything, staging and recoveries included.
 
 | Paging alert | Fires when |
 |---|---|
 | SWG production down (page) | The `inbrowser.link` health check goes unhealthy: the gateway is down for users, including every production pool being down at once |
 | SWG production pool down (page) | The `pages-production` pool goes unhealthy (pool events only: one origin, so origin events would page twice) |
-| SWG badbits sync (page) | The badbits denylist hasn't synced for 2h |
-| SWG Pages production deployment failed (page) | A production deployment of `ipfs-service-worker-gateway` fails |
 
-Traffic anomalies don't page: Cloudflare's fixed thresholds make them too
-noisy. Each paging alert is a PagerDuty-only copy of a Slack and email alert,
+The other alerts don't page. The badbits sync and failed Pages deployments
+aren't urgent: the edge keeps blocking the last synced list, and the previous
+deployment keeps serving. Traffic anomalies are too noisy: Cloudflare's
+thresholds are fixed. Each paging alert is a PagerDuty-only copy of a Slack and email alert,
 filtered to the bad event, because each event opens a PagerDuty incident: a
 recovery would open another one. Recovery shows in Slack; resolve the incident
 in PagerDuty.

@@ -146,10 +146,12 @@ resource "cloudflare_notification_policy" "production_down_page" {
   mechanisms = local.pagerduty
 }
 
-# The other SWG alerts also page, production only and for the bad event only,
-# like production_down_page above. Each is a PagerDuty-only copy of the Slack
-# and email alert it mirrors. Traffic anomalies don't page: Cloudflare's fixed
-# thresholds make them too noisy to wake someone up.
+# A production pool outage also pages, like production_down_page above:
+# production only, bad event only, a PagerDuty-only copy of the Slack and email
+# alert it mirrors. The other SWG alerts don't page: the badbits sync and
+# failed Pages deployments aren't urgent (the edge keeps the last list, and the
+# previous deployment keeps serving), and Cloudflare's fixed traffic anomaly
+# thresholds are too noisy to wake someone up.
 locals {
   pagerduty = { pagerduty = [{ id = var.pagerduty_id }] }
 }
@@ -169,43 +171,6 @@ resource "cloudflare_notification_policy" "production_pool_down_page" {
     pool_id      = [data.terraform_remote_state.load_balancing.outputs.pool_ids.pages_production]
     event_source = ["pool"]
     new_health   = ["Unhealthy"]
-  }
-
-  mechanisms = local.pagerduty
-}
-
-# The badbits denylist hasn't synced for 2h (inbrowser.link only).
-resource "cloudflare_notification_policy" "badbits_sync_page" {
-  count = var.pagerduty_id == "" ? 0 : 1
-
-  account_id  = local.account_id
-  name        = "SWG badbits sync (page)"
-  description = "swg-badbits-sync on inbrowser.link is unhealthy. ${local.managed_by}"
-  alert_type  = "health_check_status_notification"
-  enabled     = true
-
-  filters = {
-    health_check_id = [data.terraform_remote_state.zone["inbrowser.link"].outputs.badbits_health_check_id]
-    status          = ["Unhealthy"]
-  }
-
-  mechanisms = local.pagerduty
-}
-
-# A production deployment of the gateway's Pages project fails.
-resource "cloudflare_notification_policy" "pages_deployment_failed_page" {
-  count = var.pagerduty_id == "" ? 0 : 1
-
-  account_id  = local.account_id
-  name        = "SWG Pages production deployment failed (page)"
-  description = "ipfs-service-worker-gateway Pages project, production. ${local.managed_by}"
-  alert_type  = "pages_event_alert"
-  enabled     = true
-
-  filters = {
-    project_id  = [local.pages_project_uuid]
-    environment = ["ENVIRONMENT_PRODUCTION"]
-    event       = ["EVENT_DEPLOYMENT_FAILED"]
   }
 
   mechanisms = local.pagerduty
