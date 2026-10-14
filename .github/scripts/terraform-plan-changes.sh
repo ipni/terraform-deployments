@@ -8,10 +8,12 @@ set -euo pipefail
 
 sha256() { if command -v sha256sum >/dev/null; then sha256sum; else shasum -a 256; fi; }
 
+# An import shows as a no-op with .change.importing set: list it as "import"
+# (or e.g. "import,update"), or a PR that only imports would apply nothing.
 terraform show -json "$1" | jq -c '
   (.resource_changes[]?
-   | select(.change.actions != ["no-op"] and .change.actions != ["read"])
-   | {k: "\(.change.actions | join(",")) \(.address)", v: .change.after}),
+   | select((.change.actions != ["no-op"] or .change.importing != null) and .change.actions != ["read"])
+   | {k: "\([if .change.importing != null then "import" else empty end] + (.change.actions - ["no-op"]) | join(",")) \(.address)", v: .change.after}),
   ((.output_changes // {}) | to_entries[]
    | select(.value.actions != ["no-op"])
    | {k: "\(.value.actions | join(",")) output.\(.key)", v: .value.after})' |
