@@ -143,7 +143,35 @@ resource "cloudflare_notification_policy" "production_down_page" {
     status          = ["Unhealthy"]
   }
 
-  mechanisms = {
-    pagerduty = [{ id = var.pagerduty_id }]
+  mechanisms = local.pagerduty
+}
+
+# A production pool outage also pages, like production_down_page above:
+# production only, bad event only, a PagerDuty-only copy of the Slack and email
+# alert it mirrors. The other SWG alerts don't page: the badbits sync and
+# failed Pages deployments aren't urgent (the edge keeps the last list, and the
+# previous deployment keeps serving), and Cloudflare's fixed traffic anomaly
+# thresholds are too noisy to wake someone up.
+locals {
+  pagerduty = { pagerduty = [{ id = var.pagerduty_id }] }
+}
+
+# The pages-production pool goes unhealthy. Pool events only: it has a single
+# origin, so origin events would page twice for the same outage.
+resource "cloudflare_notification_policy" "production_pool_down_page" {
+  count = var.pagerduty_id == "" ? 0 : 1
+
+  account_id  = local.account_id
+  name        = "SWG production pool down (page)"
+  description = "pages-production pool is unhealthy. ${local.managed_by}"
+  alert_type  = "load_balancing_health_alert"
+  enabled     = true
+
+  filters = {
+    pool_id      = [data.terraform_remote_state.load_balancing.outputs.pool_ids.pages_production]
+    event_source = ["pool"]
+    new_health   = ["Unhealthy"]
   }
+
+  mechanisms = local.pagerduty
 }

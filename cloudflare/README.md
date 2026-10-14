@@ -154,15 +154,23 @@ inputs in each `main.tf`.
 
 ### Paging
 
-One alert pages the on-call person through PagerDuty instead of Slack:
-**SWG production down (page)**, raised when the `inbrowser.link` health check
-goes unhealthy. That covers the gateway being down for users, including every
-production pool being down at once (the load balancer then has nowhere to send
-the check). A single pool or origin going down doesn't page: the load balancer
-fails over, and the Slack alert is enough.
+Production outages also page the on-call person, through the PagerDuty
+service **Service Worker Gateway** ([pagerduty/](../pagerduty/README.md)).
+Production only, and for the bad event only; Slack and email still get
+everything, staging and recoveries included.
 
-Only the Unhealthy event is sent, because each event opens a PagerDuty
-incident. Recovery shows in Slack; resolve the incident in PagerDuty.
+| Paging alert | Fires when |
+|---|---|
+| SWG production down (page) | The `inbrowser.link` health check goes unhealthy: the gateway is down for users, including every production pool being down at once |
+| SWG production pool down (page) | The `pages-production` pool goes unhealthy (pool events only: one origin, so origin events would page twice) |
+
+The other alerts don't page. The badbits sync and failed Pages deployments
+aren't urgent: the edge keeps blocking the last synced list, and the previous
+deployment keeps serving. Traffic anomalies are too noisy: Cloudflare's
+thresholds are fixed. Each paging alert is a PagerDuty-only copy of a Slack and email alert,
+filtered to the bad event, because each event opens a PagerDuty incident: a
+recovery would open another one. Recovery shows in Slack; resolve the incident
+in PagerDuty.
 
 The PagerDuty destination is connected once in the dashboard (Notifications >
 Destinations > PagerDuty > Connect, choosing the PagerDuty service), because
@@ -174,7 +182,7 @@ curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
   https://api.cloudflare.com/client/v4/accounts/<account>/alerting/v3/destinations/pagerduty | jq '.result'
 ```
 
-While the variable is empty, the paging alert isn't created.
+While the variable is empty, the paging alerts aren't created.
 
 There is no origin 5xx error rate alert (`http_alert_origin_error`): Cloudflare
 rejected `slo = ["99.5"]` with error 17007 (its thresholds are fixed per
