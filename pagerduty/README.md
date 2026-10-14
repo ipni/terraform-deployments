@@ -37,8 +37,9 @@ a public alias, their GitHub handle:
 {"alice": {"id": "PABC123", "name": "Alice …", "email": "alice@…", "role": "user"}}
 ```
 
-- `role`: `owner`, `admin`, `user` or `limited_user`. Keep the account owner
-  as `owner`; the API can't change it.
+- `role`: `owner`, `admin`, `user` or `limited_user`. An API key can't
+  modify the account owner at all (403), so keep the owner as `owner` and let
+  them change their own name or email in PagerDuty, then in the secret.
 - `id`: an existing PagerDuty user, imported. Leave it out for someone new:
   merging creates the user, and PagerDuty emails them an invitation.
 - `on_call` (default `true`): `false` keeps them out of the weekly rotation;
