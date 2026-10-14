@@ -5,7 +5,7 @@ Who is on call for IPNI, and where pages go. The paging runbook is in
 
 | Resource | What |
 |---|---|
-| Team **ipni** and its members | `pagerduty_team`, `pagerduty_user`, `pagerduty_team_membership` |
+| Members | `pagerduty_user` (no team: see [Plan](#plan)) |
 | Schedule **IPNI on-call** | One person at a time, a week each, handing over on Monday at 09:00 UTC, in alias order |
 | Escalation policy **IPNI** | The person on call, then everyone after 15 minutes; runs twice. Was the account's "Default" policy |
 | Service **Service Worker Gateway** | Paged by Cloudflare when inbrowser.link is down (`production_down_page` in `cloudflare/notifications`). Was the "Default Service" that connecting Cloudflare created; its Cloudflare integration isn't managed here |
@@ -14,6 +14,15 @@ Who is on call for IPNI, and where pages go. The paging runbook is in
 
 State: `s3://ipni-terraform-state/pagerduty/terraform.tfstate`. CI plans and
 applies it with the Cloudflare stacks (same workflow, same approval).
+
+## Plan
+
+We stay on PagerDuty's **Free** plan: up to 5 users, one schedule and one
+escalation policy, with the API and integrations included, and 100 phone or
+SMS notifications a month (push through the app isn't capped). Teams are a
+paid feature, so nothing here uses one: who is paged comes from the schedule
+and the escalation policy. The team `ipni` created in the UI is no longer
+managed by Terraform. A 6th person, or a second rotation, needs a paid plan.
 
 ## Not managed here
 

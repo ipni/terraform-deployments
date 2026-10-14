@@ -18,15 +18,22 @@ locals {
   on_call = [for a in sort(local.aliases) : a if nonsensitive(var.members[a].on_call)]
 }
 
-# Created in the UI.
-resource "pagerduty_team" "ipni" {
-  name        = "ipni"
-  description = local.managed_by
+# Teams are a paid feature, and we stay on the Free plan (5 users, one
+# schedule, one escalation policy). Terraform no longer manages the team
+# "ipni" or its memberships; they stay in PagerDuty until the plan drops them,
+# and who is paged comes from the schedule and escalation policy anyway.
+removed {
+  from = pagerduty_team.ipni
+  lifecycle {
+    destroy = false
+  }
 }
 
-import {
-  to = pagerduty_team.ipni
-  id = "PWRBIVW"
+removed {
+  from = pagerduty_team_membership.member
+  lifecycle {
+    destroy = false
+  }
 }
 
 resource "pagerduty_user" "member" {
@@ -55,27 +62,12 @@ import {
   id = each.value
 }
 
-resource "pagerduty_team_membership" "member" {
-  for_each = local.aliases
-
-  team_id = pagerduty_team.ipni.id
-  user_id = pagerduty_user.member[each.key].id
-}
-
-import {
-  for_each = local.existing_users
-
-  to = pagerduty_team_membership.member[each.key]
-  id = "${each.value}:PWRBIVW"
-}
-
 # One person on call at a time, a week each, handing over on Monday at 09:00
 # UTC, in alias order.
 resource "pagerduty_schedulev2" "on_call" {
   name        = "IPNI on-call"
   description = local.managed_by
   time_zone   = "Etc/UTC"
-  teams       = [pagerduty_team.ipni.id]
 
   # PagerDuty stores Etc/UTC as "UTC", which the provider rejects as a value,
   # so every plan wanted to change it back. To change the time zone, remove
@@ -114,7 +106,6 @@ resource "pagerduty_escalation_policy" "ipni" {
   name        = "IPNI"
   description = local.managed_by
   num_loops   = 2
-  teams       = [pagerduty_team.ipni.id]
 
   rule {
     escalation_delay_in_minutes = 15
