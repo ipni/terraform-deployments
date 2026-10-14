@@ -227,14 +227,15 @@ Merge:  gitleaks -> changes -> to-apply -> apply (waits for a code owner)
    changes", the apply is skipped and there is nothing to approve (a dashboard
    change made since the PR was planned is then caught by the nightly drift
    check). Then, for each affected stack, in the order `load-balancing`,
-   `inbrowser.link`, `inbrowser.dev`, `notifications`, `ipni.io`: plan again, compare with
+   `inbrowser.link`, `inbrowser.dev`, `notifications`, `ipni.io`, then
+   [`pagerduty`](../pagerduty/README.md) (same workflow): plan again, compare with
    the plan last posted on the merged PR, and apply only if they are the same.
 4. **If the plans differ** (most often a dashboard change after the PR was
    planned), that stack and the ones after it are not applied and the run fails
    with the diff. Sync the change into the code in a new PR (see the drift
    steps under Load balancing) and merge it.
 
-A manual run (Actions → Terraform (Cloudflare) → Run workflow) only plans, e.g.
+A manual run (Actions → Terraform → Run workflow) only plans, e.g.
 to check for drift. Nothing applies except a merge.
 
 Why this cannot overwrite state: every plan and apply holds the S3 state lock,

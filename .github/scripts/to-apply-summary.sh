@@ -27,6 +27,7 @@ for stack in $(jq -r '.[]' <<<"$stacks"); do
       a = $1
       sub(/^create$/, "➕ create", a); sub(/^update$/, "✏️ update", a)
       sub(/^delete$/, "➖ delete", a); sub(/^(delete,create|create,delete)$/, "♻️ replace", a)
+      sub(/^import$/, "📥 import", a); sub(/^import,update$/, "📥 import, ✏️ update", a)
       print "| " a " | " bt $2 bt " |"
     }' "$f"
     echo

@@ -1,6 +1,7 @@
-# IAM roles that the "Terraform (Cloudflare)" GitHub Actions workflow assumes
-# through GitHub OIDC to reach the state bucket. Applied by hand by someone
-# with IAM rights; CI never applies this stack.
+# IAM roles that the "Terraform" GitHub Actions workflow
+# (terraform-cloudflare.yml) assumes through GitHub OIDC to reach the state
+# bucket. Applied by hand by someone with IAM rights; CI never applies this
+# stack.
 #
 # - plan:  pull requests and manual runs on main. Reads state, can only write
 #          the lock file, so it can never change state.
@@ -32,7 +33,9 @@ locals {
   # name never matches. IDs from `gh api repos/ipni/terraform-deployments`.
   repo         = "ipni@115147265/terraform-deployments@1400567172"
   state_bucket = "arn:aws:s3:::ipni-terraform-state"
-  state_prefix = "cloudflare/"
+  # The state of the stacks CI plans and applies: cloudflare/<stack>/ and
+  # pagerduty/.
+  state_prefixes = ["cloudflare/", "pagerduty/"]
 }
 
 # Created outside Terraform and shared with other ipni workflows.
@@ -93,16 +96,16 @@ data "aws_iam_policy_document" "state_plan" {
     condition {
       test     = "StringLike"
       variable = "s3:prefix"
-      values   = ["${local.state_prefix}*"]
+      values   = [for p in local.state_prefixes : "${p}*"]
     }
   }
   statement {
     actions   = ["s3:GetObject"]
-    resources = ["${local.state_bucket}/${local.state_prefix}*"]
+    resources = [for p in local.state_prefixes : "${local.state_bucket}/${p}*"]
   }
   statement {
     actions   = ["s3:PutObject", "s3:DeleteObject"]
-    resources = ["${local.state_bucket}/${local.state_prefix}*.tflock"]
+    resources = [for p in local.state_prefixes : "${local.state_bucket}/${p}*.tflock"]
   }
 }
 
@@ -113,16 +116,16 @@ data "aws_iam_policy_document" "state_apply" {
     condition {
       test     = "StringLike"
       variable = "s3:prefix"
-      values   = ["${local.state_prefix}*"]
+      values   = [for p in local.state_prefixes : "${p}*"]
     }
   }
   statement {
     actions   = ["s3:GetObject", "s3:PutObject"]
-    resources = ["${local.state_bucket}/${local.state_prefix}*"]
+    resources = [for p in local.state_prefixes : "${local.state_bucket}/${p}*"]
   }
   statement {
     actions   = ["s3:DeleteObject"]
-    resources = ["${local.state_bucket}/${local.state_prefix}*.tflock"]
+    resources = [for p in local.state_prefixes : "${local.state_bucket}/${p}*.tflock"]
   }
 }
 

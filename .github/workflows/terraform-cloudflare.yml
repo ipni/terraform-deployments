@@ -1,4 +1,6 @@
-# Plan on the PR, apply on merge, for the Cloudflare stacks in cloudflare/.
+# Plan on the PR, apply on merge, for the Cloudflare stacks in cloudflare/ and
+# the PagerDuty stack in pagerduty/. The file keeps its old name: the apply
+# job looks up the PR's plan runs by it.
 #
 #   PR:     gitleaks -> changes -> plan (per stack) -> to-apply
 #   Merge:  gitleaks -> changes -> to-apply -> apply (waits for a code owner)
@@ -14,11 +16,11 @@
 #   changes", there is nothing to approve and the apply job is skipped. Then,
 #   for each affected stack, in STACK_ORDER, plan again and apply only if the
 #   plan is the same as the one last posted on the merged PR. If it differs
-#   (e.g. someone changed Cloudflare in the dashboard after the PR was
+#   (e.g. someone changed Cloudflare or PagerDuty by hand after the PR was
 #   planned), nothing more is applied: sync the drift in a PR.
 # - Manual run (Actions tab): plan only. Merging is the only way to apply.
 # - Nightly: plan every stack; if anything differs from the code (someone
-#   changed Cloudflare outside this repo) or the plan fails, post it to Slack
+#   changed Cloudflare or PagerDuty outside this repo) or the plan fails, post it to Slack
 #   #ipni-alerts. Silent when everything matches.
 # - Every merge that applies something, or fails to, is posted to #ipni-alerts.
 #
@@ -28,7 +30,7 @@
 #
 # Public repo: pull requests from forks get no secrets and no OIDC token, so
 # their plan is skipped; a maintainer re-opens the change from a branch here.
-name: Terraform (Cloudflare)
+name: Terraform
 
 on:
   # Every PR, so the required "Terraform plan" check always reports; the
@@ -63,8 +65,9 @@ env:
   AWS_REGION: us-east-2
   # Apply order: the zones and notifications read pool IDs from load-balancing;
   # notifications goes last so it can also use IDs the zones create. ipni.io
-  # depends on none of them.
-  STACK_ORDER: load-balancing inbrowser.link inbrowser.dev notifications ipni.io
+  # and pagerduty depend on none of them. Every stack is cloudflare/<stack>,
+  # except pagerduty (pagerduty/).
+  STACK_ORDER: load-balancing inbrowser.link inbrowser.dev notifications ipni.io pagerduty
 
 jobs:
   # Fails a PR or push that adds a secret anywhere in its commits; nothing is
@@ -123,7 +126,8 @@ jobs:
             if grep -q '^\.github/workflows/terraform-cloudflare\.yml$' <<<"$files"; then wanted="$STACK_ORDER"; fi
             if grep -q '^cloudflare/modules/' <<<"$files"; then wanted+=" inbrowser.link inbrowser.dev"; fi
             for s in $STACK_ORDER; do
-              if grep -q "^cloudflare/$s/" <<<"$files"; then wanted+=" $s"; fi
+              [[ "$s" == pagerduty ]] && dir=pagerduty || dir="cloudflare/$s"
+              if grep -q "^$dir/" <<<"$files"; then wanted+=" $s"; fi
             done
           fi
           # Keep STACK_ORDER order, drop duplicates and unknown names.
@@ -150,14 +154,19 @@ jobs:
         stack: ${{ fromJSON(needs.changes.outputs.stacks) }}
     defaults:
       run:
-        working-directory: cloudflare/${{ matrix.stack }}
+        working-directory: ${{ matrix.stack == 'pagerduty' && 'pagerduty' || format('cloudflare/{0}', matrix.stack) }}
     env:
+      STACK_DIR: ${{ matrix.stack == 'pagerduty' && 'pagerduty' || format('cloudflare/{0}', matrix.stack) }}
       # ipni.io is in another Cloudflare account, with its own tokens.
       CLOUDFLARE_API_TOKEN: ${{ matrix.stack == 'ipni.io' && secrets.CLOUDFLARE_IPNI_IO_API_TOKEN_READ || secrets.CLOUDFLARE_API_TOKEN_READ }}
       TF_VAR_slack_webhook_url: ${{ secrets.SWG_ALERTS_SLACK_WEBHOOK_URL }}
       TF_VAR_rainbow_origins: ${{ secrets.RAINBOW_ORIGINS }}
       TF_VAR_alert_emails: ${{ secrets.SWG_ALERT_EMAILS }}
       TF_VAR_pagerduty_id: ${{ vars.CLOUDFLARE_PAGERDUTY_ID }}
+      # Read-only PagerDuty API key, and the members (names, emails) only for
+      # the pagerduty stack.
+      PAGERDUTY_TOKEN: ${{ matrix.stack == 'pagerduty' && secrets.PAGERDUTY_TOKEN_READ || '' }}
+      TF_VAR_members: ${{ matrix.stack == 'pagerduty' && secrets.PAGERDUTY_MEMBERS || '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -172,7 +181,7 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
           mask-aws-account-id: true
 
-      - run: terraform fmt -check -recursive ..
+      - run: terraform fmt -check -recursive "$GITHUB_WORKSPACE"
       - run: terraform init -lockfile=readonly
       - run: terraform validate
 
@@ -187,7 +196,7 @@ jobs:
           echo "exitcode=$code" >> "$GITHUB_OUTPUT"
           [[ $code -eq 1 ]] && exit 1
           terraform show -no-color tfplan > plan.txt
-          ../../.github/scripts/terraform-plan-changes.sh tfplan > changes.txt
+          "$GITHUB_WORKSPACE/.github/scripts/terraform-plan-changes.sh" tfplan > changes.txt
           {
             echo "### \`${{ matrix.stack }}\`"
             if [[ $code -eq 0 ]]; then echo "No changes."; else echo '```'; cat changes.txt; grep -E '^Plan:' plan.txt || true; echo '```'; fi
@@ -205,12 +214,12 @@ jobs:
         run: |
           set -euo pipefail
           if [[ "$FAILED" == true ]]; then
-            printf ':x: *Cloudflare drift check failed* for %s. <%s|Run>\n' "\`$STACK\`" "$RUN_URL"
+            printf ':x: *Terraform drift check failed* for %s. <%s|Run>\n' "\`$STACK\`" "$RUN_URL"
           else
-            printf ':warning: *Cloudflare drift* on %s: %s\n' "\`$STACK\`" "$(grep -E '^Plan:' plan.txt || echo 'outputs changed')"
-            printf 'Cloudflare differs from the code, most likely a dashboard change. Sync it into the code in a PR (or revert it in the dashboard). <%s|Plan>\n' "$RUN_URL"
+            printf ':warning: *Terraform drift* on %s: %s\n' "\`$STACK\`" "$(grep -E '^Plan:' plan.txt || echo 'outputs changed')"
+            printf 'The live config differs from the code, most likely a dashboard change. Sync it into the code in a PR (or revert it in the dashboard). <%s|Plan>\n' "$RUN_URL"
             awk '{print "• " $1 " `" $2 "`"}' changes.txt
-          fi | ../../.github/scripts/slack-post.sh
+          fi | "$GITHUB_WORKSPACE/.github/scripts/slack-post.sh"
 
       # to-apply lists it; the merge compares its own plan with it before applying.
       - name: Upload plan summary
@@ -218,7 +227,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: plan-changes-${{ matrix.stack }}
-          path: cloudflare/${{ matrix.stack }}/changes.txt
+          path: ${{ env.STACK_DIR }}/changes.txt
           retention-days: 30
 
       - name: Comment plan on PR
@@ -227,7 +236,7 @@ jobs:
         env:
           STACK: ${{ matrix.stack }}
           EXITCODE: ${{ steps.plan.outputs.exitcode }}
-          PLAN_DIR: cloudflare/${{ matrix.stack }}
+          PLAN_DIR: ${{ env.STACK_DIR }}
         with:
           script: |
             const fs = require('fs');
@@ -278,7 +287,7 @@ jobs:
           [[ "$GITLEAKS" == success ]] || { echo "::error::Secret scan $GITLEAKS: nothing planned or applied."; exit 1; }
           [[ "$CHANGES" == success ]] || { echo "::error::Picking the stacks failed."; exit 1; }
           if [[ "$STACKS" == '[]' ]]; then
-            echo "No Cloudflare stacks affected: nothing to apply." | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "No stacks affected: nothing to apply." | tee -a "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
           # Skipped with stacks to plan means a fork PR: no secrets, no plan.
@@ -301,7 +310,7 @@ jobs:
           set -euo pipefail
           pr=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" --jq '[.[] | select(.merged_at != null)][0]')
           if [[ -z "$pr" || "$pr" == null ]]; then
-            echo "::error::$GITHUB_SHA is not a merged PR. Changes to cloudflare/ must go through a PR."
+            echo "::error::$GITHUB_SHA is not a merged PR. Changes to the stacks must go through a PR."
             exit 1
           fi
           number=$(jq -r .number <<<"$pr"); head=$(jq -r .head.sha <<<"$pr")
@@ -369,6 +378,9 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       # For the ipni.io stack, which is in another Cloudflare account.
       CLOUDFLARE_IPNI_IO_API_TOKEN: ${{ secrets.CLOUDFLARE_IPNI_IO_API_TOKEN }}
+      # Full-access PagerDuty API key, a secret of the production environment.
+      PAGERDUTY_TOKEN: ${{ secrets.PAGERDUTY_TOKEN }}
+      TF_VAR_members: ${{ secrets.PAGERDUTY_MEMBERS }}
       TF_VAR_slack_webhook_url: ${{ secrets.SWG_ALERTS_SLACK_WEBHOOK_URL }}
       TF_VAR_rainbow_origins: ${{ secrets.RAINBOW_ORIGINS }}
       TF_VAR_alert_emails: ${{ secrets.SWG_ALERT_EMAILS }}
@@ -397,7 +409,7 @@ jobs:
           set -euo pipefail
           pr=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" --jq '[.[] | select(.merged_at != null)][0]')
           if [[ -z "$pr" || "$pr" == null ]]; then
-            echo "::error::$GITHUB_SHA is not a merged PR. Changes to cloudflare/ must go through a PR."
+            echo "::error::$GITHUB_SHA is not a merged PR. Changes to the stacks must go through a PR."
             exit 1
           fi
           number=$(jq -r .number <<<"$pr"); head=$(jq -r .head.sha <<<"$pr")
@@ -438,7 +450,8 @@ jobs:
             fi
             echo "::group::$stack"
             echo "STACK $stack" >> "$results"
-            cd "$GITHUB_WORKSPACE/cloudflare/$stack"
+            [[ "$stack" == pagerduty ]] && dir=pagerduty || dir="cloudflare/$stack"
+            cd "$GITHUB_WORKSPACE/$dir"
             terraform init -lockfile=readonly
             set +e
             terraform plan -lock-timeout=10m -detailed-exitcode -out=tfplan
@@ -468,7 +481,7 @@ jobs:
           done
 
       # Posts what was applied, or that the apply failed, to #ipni-alerts.
-      # Silent when the merge changed nothing in Cloudflare.
+      # Silent when the merge changed nothing.
       - name: Report to Slack
         if: always()
         env:
@@ -492,9 +505,9 @@ jobs:
           by=""; [[ -n "$MERGER" ]] && by=" (merged by $MERGER)"
           {
             if [[ "$OUTCOME" == success ]]; then
-              echo ":white_check_mark: *Cloudflare applied* $pr$by"
+              echo ":white_check_mark: *Terraform applied* $pr$by"
             else
-              echo ":x: *Cloudflare apply stopped* on $pr$by. Stacks after the failing one were not applied."
+              echo ":x: *Terraform apply stopped* on $pr$by. Stacks after the failing one were not applied."
             fi
             # A STACK line without APPLIED/NOCHANGE after it is the one that failed.
             awk -v bt='`' '
