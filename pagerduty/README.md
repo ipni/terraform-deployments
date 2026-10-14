@@ -9,7 +9,8 @@ Who is on call for IPNI, and where pages go. The paging runbook is in
 | Schedule **IPNI on-call** | One person at a time, a week each, handing over on Monday at 09:00 UTC, in alias order |
 | Escalation policy **IPNI** | The person on call, then everyone after 15 minutes; runs twice. Was the account's "Default" policy |
 | Service **Service Worker Gateway** | Paged by Cloudflare when inbrowser.link is down (`production_down_page` in `cloudflare/notifications`). Was the "Default Service" that connecting Cloudflare created; its Cloudflare integration isn't managed here |
-| Service **IPNI indexers** | Paged by Alertmanager (ipni/infra) and grafana.ipni.io through its **Events API v2** integration |
+| Service **IPNI indexers** | The indexers on sf and sf2, paged by grafana.ipni.io through its **Events API v2** integration |
+| Service **needle** | The routing service on the k3s boxes (sing1, lith1, chic1) and the boxes themselves, paged by the hub's Alertmanager (ipni/infra, lith1) through its **Events API v2** integration |
 
 State: `s3://ipni-terraform-state/pagerduty/terraform.tfstate`. CI plans and
 applies it with the Cloudflare stacks (same workflow, same approval).
@@ -51,21 +52,23 @@ in plans; the rest shows as `(sensitive value)`.
 To add or remove someone: update the secret and the 1Password note, then open
 a PR touching this folder (a comment is enough) so CI plans it.
 
-## Integration key
+## Integration keys
 
-Alertmanager and Grafana send events with the **IPNI indexers** integration
-key. It's an output marked sensitive, so CI never prints it. Read it once
-locally and store it where they read it:
+Each service has its own Events API v2 integration key. They're outputs marked
+sensitive, so CI never prints them. Read one locally and store it where its
+sender reads it:
+
+| Output | Sender | Stored in |
+|---|---|---|
+| `indexers_integration_key` | grafana.ipni.io (sf, sf2) | Grafana: the PagerDuty contact point |
+| `needle_integration_key` | Alertmanager on lith1 | ipni/infra SOPS: `alertmanager-secrets` → `pagerduty-routing-key` |
 
 ```sh
-terraform output -raw indexers_integration_key
+terraform output -raw needle_integration_key | pbcopy
 ```
 
-- ipni/infra SOPS: `alertmanager-secrets` → `pagerduty-routing-key`
-- grafana.ipni.io: the PagerDuty contact point
-
-The integration has `prevent_destroy`: recreating it would change the key, and
-both would silently stop paging.
+Both integrations have `prevent_destroy`: recreating one would change its key,
+and its sender would silently stop paging.
 
 ## Local plan
 

@@ -159,11 +159,11 @@ import {
   id = "P43ELBB"
 }
 
-# Paged by Alertmanager in ipni/infra and by grafana.ipni.io, through the
-# Events API v2 integration below.
+# The indexers on sf and sf2, paged by grafana.ipni.io through the Events API
+# v2 integration below.
 resource "pagerduty_service" "indexers" {
   name              = "IPNI indexers"
-  description       = "Paged by Alertmanager (ipni/infra) and grafana.ipni.io. ${local.managed_by}"
+  description       = "Indexers on sf and sf2, paged by grafana.ipni.io. ${local.managed_by}"
   escalation_policy = pagerduty_escalation_policy.ipni.id
 }
 
@@ -172,8 +172,29 @@ resource "pagerduty_service_integration" "indexers_events" {
   service = pagerduty_service.indexers.id
   type    = "events_api_v2_inbound_integration"
 
-  # Recreating it changes the integration key, and Alertmanager and Grafana
-  # would silently stop paging until both were updated.
+  # Recreating it changes the integration key, and Grafana would silently stop
+  # paging until it was updated.
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+# needle, the routing service on the k3s boxes (sing1, lith1, chic1), and the
+# boxes themselves: paged by the hub's Alertmanager in ipni/infra (lith1) for
+# its critical alerts (endpoint probes, box down, ZFS pool).
+resource "pagerduty_service" "needle" {
+  name              = "needle"
+  description       = "Routing service on the k3s boxes, paged by Alertmanager on lith1 (ipni/infra). ${local.managed_by}"
+  escalation_policy = pagerduty_escalation_policy.ipni.id
+}
+
+resource "pagerduty_service_integration" "needle_events" {
+  name    = "Events API v2"
+  service = pagerduty_service.needle.id
+  type    = "events_api_v2_inbound_integration"
+
+  # Recreating it changes the integration key, and Alertmanager would silently
+  # stop paging until ipni/infra's SOPS secret was updated.
   lifecycle {
     prevent_destroy = true
   }
