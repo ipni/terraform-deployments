@@ -67,14 +67,12 @@ import {
 resource "pagerduty_schedulev2" "on_call" {
   name        = "IPNI on-call"
   description = local.managed_by
-  time_zone   = "Etc/UTC"
-
-  # PagerDuty stores Etc/UTC as "UTC", which the provider rejects as a value,
-  # so every plan wanted to change it back. To change the time zone, remove
-  # this, apply, and put it back.
-  lifecycle {
-    ignore_changes = [time_zone]
-  }
+  # UTC all year (no daylight saving since 1972), and spelled so the provider
+  # can round-trip it. With Etc/UTC, the provider reads PagerDuty's value back
+  # as "UTC" (v3.36.0), which its own validator and the API both reject: plans
+  # always showed a diff, and ignoring it made every schedule update fail
+  # ("Timezone is not supported").
+  time_zone = "Africa/Monrovia"
 
   rotation {
     event {
