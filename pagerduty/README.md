@@ -11,6 +11,7 @@ Who is on call for IPNI, and where pages go. The paging runbook is in
 | Service **Service Worker Gateway** | Paged by Cloudflare when inbrowser.link is down (`production_down_page` in `cloudflare/notifications`). Was the "Default Service" that connecting Cloudflare created; its Cloudflare integration isn't managed here |
 | Service **IPNI indexers** | The indexers on sf and sf2, paged by grafana.ipni.io through its **Events API v2** integration |
 | Service **needle** | The routing service on the k3s boxes (sing1, lith1, chic1) and the boxes themselves, paged by the hub's Alertmanager (ipni/infra, lith1) through its **Events API v2** integration |
+| Services **bootstrap**, **content**, **route-origin** | The other priority services on the k3s boxes (kubo bootstrappers; kubo, ipfs-cluster and the pinning Envoy; the Envoy in front of needle), each paged by the same Alertmanager through its own **Events API v2** integration, so the incident names the service. Box-level alerts stay on **needle** |
 
 State: `s3://ipni-terraform-state/pagerduty/terraform.tfstate`. CI plans and
 applies it with the Cloudflare stacks (same workflow, same approval).
@@ -71,12 +72,15 @@ sender reads it:
 |---|---|---|
 | `indexers_integration_key` | grafana.ipni.io (sf, sf2) | Grafana: the PagerDuty contact point |
 | `needle_integration_key` | Alertmanager on lith1 | ipni/infra SOPS: `alertmanager-secrets` → `pagerduty-routing-key` |
+| `bootstrap_integration_key` | Alertmanager on lith1 | ipni/infra SOPS: `alertmanager-secrets` → `pagerduty-bootstrap-routing-key` |
+| `content_integration_key` | Alertmanager on lith1 | ipni/infra SOPS: `alertmanager-secrets` → `pagerduty-content-routing-key` |
+| `route_origin_integration_key` | Alertmanager on lith1 | ipni/infra SOPS: `alertmanager-secrets` → `pagerduty-route-origin-routing-key` |
 
 ```sh
 terraform output -raw needle_integration_key | pbcopy
 ```
 
-Both integrations have `prevent_destroy`: recreating one would change its key,
+Every integration has `prevent_destroy`: recreating one would change its key,
 and its sender would silently stop paging.
 
 ## Local plan

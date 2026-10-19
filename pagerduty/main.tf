@@ -188,3 +188,62 @@ resource "pagerduty_service_integration" "needle_events" {
     prevent_destroy = true
   }
 }
+
+# The other priority services on the k3s boxes, each paged by the hub's
+# Alertmanager for its own critical alerts (no ready pod, endpoint and libp2p
+# probes), so an incident says which service is down. Box-level alerts stay on
+# needle.
+
+# bootstrap: kubo and its WSS Envoy.
+resource "pagerduty_service" "bootstrap" {
+  name              = "bootstrap"
+  description       = "kubo bootstrappers on the k3s boxes, paged by Alertmanager on lith1 (ipni/infra). ${local.managed_by}"
+  escalation_policy = pagerduty_escalation_policy.ipni.id
+}
+
+resource "pagerduty_service_integration" "bootstrap_events" {
+  name    = "Events API v2"
+  service = pagerduty_service.bootstrap.id
+  type    = "events_api_v2_inbound_integration"
+
+  # Recreating it changes the integration key (see needle_events).
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+# content: kubo, ipfs-cluster and the pinning Envoy.
+resource "pagerduty_service" "content" {
+  name              = "content"
+  description       = "Content nodes on the k3s boxes, paged by Alertmanager on lith1 (ipni/infra). ${local.managed_by}"
+  escalation_policy = pagerduty_escalation_policy.ipni.id
+}
+
+resource "pagerduty_service_integration" "content_events" {
+  name    = "Events API v2"
+  service = pagerduty_service.content.id
+  type    = "events_api_v2_inbound_integration"
+
+  # Recreating it changes the integration key (see needle_events).
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+# route-origin: the Envoy in front of needle.
+resource "pagerduty_service" "route_origin" {
+  name              = "route-origin"
+  description       = "Envoy in front of needle on the k3s boxes, paged by Alertmanager on lith1 (ipni/infra). ${local.managed_by}"
+  escalation_policy = pagerduty_escalation_policy.ipni.id
+}
+
+resource "pagerduty_service_integration" "route_origin_events" {
+  name    = "Events API v2"
+  service = pagerduty_service.route_origin.id
+  type    = "events_api_v2_inbound_integration"
+
+  # Recreating it changes the integration key (see needle_events).
+  lifecycle {
+    prevent_destroy = true
+  }
+}
