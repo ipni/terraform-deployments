@@ -89,21 +89,25 @@ resource "cloudflare_notification_policy" "pages_deployment_failed" {
   mechanisms = local.mechanisms
 }
 
-# Unusual spike or drop in traffic, production only. Cloudflare's thresholds are
-# fixed (z-score above 3.5 against the last 4h, over 200 requests in 5 min), so
+# Unusual drop in traffic, production only. Cloudflare's thresholds are fixed
+# (z-score above 3.5 against the last 4h, over 200 requests in 5 min), so
 # inbrowser.dev, at about 50 requests per 5 min, alerted on every small burst
 # (18 times from 2026-09-29 to 2026-10-06, none of them actionable). Staging
 # outages are still caught by the health check and pool health alerts.
+# Drops only: spikes (crawlers, a link going viral) aren't actionable, and
+# a drop is what an outage looks like. Traffic already mitigated by the WAF or
+# DoS protection is excluded so blocked bot bursts don't count.
 resource "cloudflare_notification_policy" "traffic_anomalies" {
   account_id  = local.account_id
   name        = "SWG traffic anomalies"
-  description = "inbrowser.link. ${local.managed_by}"
+  description = "inbrowser.link, traffic drops. ${local.managed_by}"
   alert_type  = "traffic_anomalies_alert"
   enabled     = true
 
   filters = {
     zones                     = ["3cf6893c26dde38efa39910a57798a59"] # inbrowser.link
-    alert_trigger_preferences = ["zscore_spike_and_drop"]
+    alert_trigger_preferences = ["zscore_drop"]
+    traffic_exclusions        = ["security_events"]
   }
 
   mechanisms = local.mechanisms
