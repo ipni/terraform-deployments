@@ -14,6 +14,8 @@ Who is on call for IPNI, and where pages go. The paging runbook is in
 | Service **Routing origin (route-origin)** | The Envoy in front of needle: the origin of delegated-ipfs.dev and `route-<box>.ipni.io`, with TLS, the path allowlist and rate limits |
 | Service **IPFS bootstrap peers (bootstrap)** | The kubo nodes new IPFS peers dial to join the network (`bootstrap.ipni.io` and the legacy `bootstrap.libp2p.io` PeerIDs), with WSS for browsers |
 | Service **IPFS website hosting (content)** | kubo and ipfs-cluster pinning the IPFS Project websites on every box, and the `pin.ipni.io` remote pinning API |
+| Business services | **delegated-ipfs.dev**, **cid.contact**, **inbrowser.link**, **bootstrap.ipni.io**, **IPFS Project websites**: what users reach, each depending on the services behind it (`dependencies.tf`) |
+| Service dependencies | gateway → route-origin → needle → indexers, and content → bootstrap (`dependencies.tf`) |
 
 The four k3s-box services are each paged by the hub's Alertmanager (ipni/infra,
 lith1) through their own **Events API v2** integration, so the incident names
@@ -30,6 +32,25 @@ SMS notifications a month (push through the app isn't capped). Teams are a
 paid feature, so nothing here uses one: who is paged comes from the schedule
 and the escalation policy. The team `ipni` created in the UI is no longer
 managed by Terraform. A 6th person, or a second rotation, needs a paid plan.
+
+## Service standards
+
+PagerDuty scores every service against its standards (Service Directory →
+Standards). Where each stands:
+
+| Standard | How it's met |
+|---|---|
+| Has a description | `description` on every service |
+| Escalation policy with 2+ unique levels | The **IPNI** policy: the schedule, then everyone |
+| At least 1 API integration | Events API v2 on every service but the gateway, which has Cloudflare's |
+| Does not only send high urgency incidents | `severity_based` urgency on every service but the gateway: Grafana and Alertmanager send `severity=critical`, so their pages stay high. The gateway keeps constant high urgency (what severity Cloudflare sends isn't known) and is **excluded** from this standard |
+| At least 1 technical service dependency | `pagerduty_service_dependency.technical` |
+| At least 1 business service dependency | `pagerduty_business_service.public` and `pagerduty_service_dependency.business` |
+| At least 1 change integration | **Excluded for every service.** Change events need the AIOps add-on, which the Free plan doesn't have |
+| Has an extension or add-on (e.g. Slack) | **Not met yet.** It needs the PagerDuty Slack app in the Filecoin Slack workspace (approved by its admins), then a `pagerduty_slack_connection` per service to #ipni-alerts |
+
+The provider can read standards but not change them, so exclusions are set in
+the dashboard: Service Directory → Standards → the standard → Exclusions.
 
 ## Not managed here
 

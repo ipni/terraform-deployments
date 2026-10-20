@@ -142,6 +142,11 @@ resource "pagerduty_service" "swg" {
   escalation_policy       = pagerduty_escalation_policy.ipni.id
   acknowledgement_timeout = "null"
   auto_resolve_timeout    = "null"
+
+  # Always high urgency, unlike the services below: what severity Cloudflare
+  # sends isn't known, and severity-based urgency could turn its pages into
+  # low urgency ones that don't page. The standard "does not only send high
+  # urgency incidents" is excluded for this service in PagerDuty instead.
 }
 
 import {
@@ -156,6 +161,14 @@ resource "pagerduty_service" "indexers" {
   name              = "IPNI indexers (cid.contact)"
   description       = "Map CIDs to the providers that advertise them: storetheindex on sf and sf2, behind cid.contact. Paged by grafana.ipni.io. ${local.managed_by}"
   escalation_policy = pagerduty_escalation_policy.ipni.id
+  # Urgency follows the event's severity: critical and error page (high),
+  # warning and info don't (low). Alertmanager sends severity=critical, and
+  # Grafana's PagerDuty contact point defaults to it, so every page stays high
+  # urgency; PagerDuty's standards ask for a service that can also send low.
+  incident_urgency_rule {
+    type    = "constant"
+    urgency = "severity_based"
+  }
 }
 
 resource "pagerduty_service_integration" "indexers_events" {
@@ -178,6 +191,11 @@ resource "pagerduty_service" "needle" {
   name              = "Delegated routing (needle)"
   description       = "Answers provider, peer and IPNS lookups for delegated-ipfs.dev from the Amino DHT and cid.contact, on sing1, lith1 and chic1. Also gets the boxes' own alerts (box down, ZFS pool). Paged by Alertmanager on lith1 (ipni/infra). ${local.managed_by}"
   escalation_policy = pagerduty_escalation_policy.ipni.id
+  # Urgency follows the event's severity (see indexers).
+  incident_urgency_rule {
+    type    = "constant"
+    urgency = "severity_based"
+  }
 }
 
 resource "pagerduty_service_integration" "needle_events" {
@@ -203,6 +221,11 @@ resource "pagerduty_service" "bootstrap" {
   name              = "IPFS bootstrap peers (bootstrap)"
   description       = "kubo nodes that new IPFS peers dial to join the network (bootstrap.ipni.io and the legacy bootstrap.libp2p.io PeerIDs), with WSS for browsers. Paged by Alertmanager on lith1 (ipni/infra). ${local.managed_by}"
   escalation_policy = pagerduty_escalation_policy.ipni.id
+  # Urgency follows the event's severity (see indexers).
+  incident_urgency_rule {
+    type    = "constant"
+    urgency = "severity_based"
+  }
 }
 
 resource "pagerduty_service_integration" "bootstrap_events" {
@@ -222,6 +245,11 @@ resource "pagerduty_service" "content" {
   name              = "IPFS website hosting (content)"
   description       = "kubo and ipfs-cluster pinning the IPFS Project websites on every box, and the pin.ipni.io remote pinning API. Paged by Alertmanager on lith1 (ipni/infra). ${local.managed_by}"
   escalation_policy = pagerduty_escalation_policy.ipni.id
+  # Urgency follows the event's severity (see indexers).
+  incident_urgency_rule {
+    type    = "constant"
+    urgency = "severity_based"
+  }
 }
 
 resource "pagerduty_service_integration" "content_events" {
@@ -241,6 +269,11 @@ resource "pagerduty_service" "route_origin" {
   name              = "Routing origin (route-origin)"
   description       = "Envoy in front of needle: the origin of delegated-ipfs.dev and route-<box>.ipni.io, with TLS, the path allowlist and rate limits. Paged by Alertmanager on lith1 (ipni/infra). ${local.managed_by}"
   escalation_policy = pagerduty_escalation_policy.ipni.id
+  # Urgency follows the event's severity (see indexers).
+  incident_urgency_rule {
+    type    = "constant"
+    urgency = "severity_based"
+  }
 }
 
 resource "pagerduty_service_integration" "route_origin_events" {
