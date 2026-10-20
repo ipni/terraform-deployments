@@ -16,6 +16,11 @@ locals {
 
   # The rotation, in alias order. Who is on call isn't private.
   on_call = [for a in sort(local.aliases) : a if nonsensitive(var.members[a].on_call)]
+
+  # Who the first step of the escalation policy pages instead of the
+  # schedule, by alias, until it is set back to null. The schedule keeps
+  # rotating, but nobody is paged from it meanwhile.
+  on_call_override = "takgn"
 }
 
 # Teams are a paid feature, and we stay on the Free plan (5 users, one
@@ -98,18 +103,20 @@ resource "pagerduty_schedulev2" "on_call" {
   }
 }
 
-# The person on call, then everyone if nobody acknowledges within 15 minutes;
-# the whole policy runs twice. This was the account's "Default" policy.
+# The person on call (the schedule's, or local.on_call_override), then
+# everyone if nobody acknowledges within 15 minutes; the whole policy runs
+# twice. This was the account's "Default" policy.
 resource "pagerduty_escalation_policy" "ipni" {
   name        = "IPNI"
   description = local.managed_by
   num_loops   = 2
 
+  # The schedule, or the person in local.on_call_override.
   rule {
     escalation_delay_in_minutes = 15
     target {
-      type = "schedule_reference"
-      id   = pagerduty_schedulev2.on_call.id
+      type = local.on_call_override == null ? "schedule_reference" : "user_reference"
+      id   = local.on_call_override == null ? pagerduty_schedulev2.on_call.id : pagerduty_user.member[local.on_call_override].id
     }
   }
 

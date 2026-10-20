@@ -7,7 +7,7 @@ Who is on call for IPNI, and where pages go. The paging runbook is in
 |---|---|
 | Members | `pagerduty_user` (no team: see [Plan](#plan)) |
 | Schedule **IPNI on-call** | One person at a time, a week each, handing over on Monday at 09:00 UTC, in alias order |
-| Escalation policy **IPNI** | The person on call, then everyone after 15 minutes; runs twice. Was the account's "Default" policy |
+| Escalation policy **IPNI** | The person on call, then everyone after 15 minutes; runs twice. Was the account's "Default" policy. While `local.on_call_override` names an alias (in `main.tf`), the first step pages that person instead of the schedule; set it back to `null` to return to the rotation |
 | Service **Service Worker Gateway (inbrowser.link)** | Fetches and verifies IPFS content in the visitor's browser. Paged by Cloudflare when inbrowser.link is down (`production_down_page` in `cloudflare/notifications`). Was the "Default Service" that connecting Cloudflare created; its Cloudflare integration isn't managed here |
 | Service **IPNI indexers (cid.contact)** | Map CIDs to the providers that advertise them (storetheindex on sf and sf2). Paged by grafana.ipni.io through its **Events API v2** integration |
 | Service **Delegated routing (needle)** | Answers provider, peer and IPNS lookups for delegated-ipfs.dev from the Amino DHT and cid.contact, on the k3s boxes (sing1, lith1, chic1). Also gets the boxes' own alerts (box down, ZFS pool) |
