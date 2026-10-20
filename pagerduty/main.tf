@@ -130,14 +130,15 @@ import {
   id = "PYI77LX"
 }
 
-# Paged by Cloudflare when inbrowser.link is down (production_down_page in
-# cloudflare/notifications). This was the account's "Default Service":
+# The Service Worker Gateway (inbrowser.link): fetches and verifies IPFS
+# content in the visitor's browser. Paged by Cloudflare when inbrowser.link is
+# down (production_down_page in cloudflare/notifications). This was the account's "Default Service":
 # connecting Cloudflare in its dashboard created it with the Cloudflare
 # integration, which stays outside Terraform. Cloudflare never resolves the
 # incident, so it neither times out nor auto-resolves: resolve it by hand.
 resource "pagerduty_service" "swg" {
-  name                    = "Service Worker Gateway"
-  description             = "inbrowser.link, paged by Cloudflare Notifications. ${local.managed_by}"
+  name                    = "Service Worker Gateway (inbrowser.link)"
+  description             = "Fetches and verifies IPFS content in the visitor's browser, at inbrowser.link. Paged by Cloudflare Notifications. ${local.managed_by}"
   escalation_policy       = pagerduty_escalation_policy.ipni.id
   acknowledgement_timeout = "null"
   auto_resolve_timeout    = "null"
@@ -148,11 +149,12 @@ import {
   id = "P43ELBB"
 }
 
-# The indexers on sf and sf2, paged by grafana.ipni.io through the Events API
-# v2 integration below.
+# The indexers on sf and sf2 (storetheindex behind cid.contact): map CIDs to
+# the providers that advertise them. Paged by grafana.ipni.io through the
+# Events API v2 integration below.
 resource "pagerduty_service" "indexers" {
-  name              = "IPNI indexers"
-  description       = "Indexers on sf and sf2, paged by grafana.ipni.io. ${local.managed_by}"
+  name              = "IPNI indexers (cid.contact)"
+  description       = "Map CIDs to the providers that advertise them: storetheindex on sf and sf2, behind cid.contact. Paged by grafana.ipni.io. ${local.managed_by}"
   escalation_policy = pagerduty_escalation_policy.ipni.id
 }
 
@@ -168,12 +170,13 @@ resource "pagerduty_service_integration" "indexers_events" {
   }
 }
 
-# needle, the routing service on the k3s boxes (sing1, lith1, chic1), and the
-# boxes themselves: paged by the hub's Alertmanager in ipni/infra (lith1) for
-# its critical alerts (endpoint probes, box down, ZFS pool).
+# needle, the delegated routing server on the k3s boxes (sing1, lith1, chic1)
+# behind delegated-ipfs.dev: answers provider, peer and IPNS lookups from the
+# Amino DHT and cid.contact. Also the boxes themselves (box down, ZFS pool).
+# Paged by the hub's Alertmanager in ipni/infra (lith1).
 resource "pagerduty_service" "needle" {
-  name              = "needle"
-  description       = "Routing service on the k3s boxes, paged by Alertmanager on lith1 (ipni/infra). ${local.managed_by}"
+  name              = "Delegated routing (needle)"
+  description       = "Answers provider, peer and IPNS lookups for delegated-ipfs.dev from the Amino DHT and cid.contact, on sing1, lith1 and chic1. Also gets the boxes' own alerts (box down, ZFS pool). Paged by Alertmanager on lith1 (ipni/infra). ${local.managed_by}"
   escalation_policy = pagerduty_escalation_policy.ipni.id
 }
 
@@ -194,10 +197,11 @@ resource "pagerduty_service_integration" "needle_events" {
 # probes), so an incident says which service is down. Box-level alerts stay on
 # needle.
 
-# bootstrap: kubo and its WSS Envoy.
+# bootstrap: the kubo nodes new IPFS peers dial to join the network, and the
+# Envoy that gives browsers a WSS address for them.
 resource "pagerduty_service" "bootstrap" {
-  name              = "bootstrap"
-  description       = "kubo bootstrappers on the k3s boxes, paged by Alertmanager on lith1 (ipni/infra). ${local.managed_by}"
+  name              = "IPFS bootstrap peers (bootstrap)"
+  description       = "kubo nodes that new IPFS peers dial to join the network (bootstrap.ipni.io and the legacy bootstrap.libp2p.io PeerIDs), with WSS for browsers. Paged by Alertmanager on lith1 (ipni/infra). ${local.managed_by}"
   escalation_policy = pagerduty_escalation_policy.ipni.id
 }
 
@@ -212,10 +216,11 @@ resource "pagerduty_service_integration" "bootstrap_events" {
   }
 }
 
-# content: kubo, ipfs-cluster and the pinning Envoy.
+# content: kubo and ipfs-cluster pinning the IPFS Project websites on every
+# box, and the Envoy in front of the pin.ipni.io pinning API.
 resource "pagerduty_service" "content" {
-  name              = "content"
-  description       = "Content nodes on the k3s boxes, paged by Alertmanager on lith1 (ipni/infra). ${local.managed_by}"
+  name              = "IPFS website hosting (content)"
+  description       = "kubo and ipfs-cluster pinning the IPFS Project websites on every box, and the pin.ipni.io remote pinning API. Paged by Alertmanager on lith1 (ipni/infra). ${local.managed_by}"
   escalation_policy = pagerduty_escalation_policy.ipni.id
 }
 
@@ -230,10 +235,11 @@ resource "pagerduty_service_integration" "content_events" {
   }
 }
 
-# route-origin: the Envoy in front of needle.
+# route-origin: the Envoy in front of needle, the origin of delegated-ipfs.dev
+# and route-<box>.ipni.io (TLS, path allowlist, rate limits).
 resource "pagerduty_service" "route_origin" {
-  name              = "route-origin"
-  description       = "Envoy in front of needle on the k3s boxes, paged by Alertmanager on lith1 (ipni/infra). ${local.managed_by}"
+  name              = "Routing origin (route-origin)"
+  description       = "Envoy in front of needle: the origin of delegated-ipfs.dev and route-<box>.ipni.io, with TLS, the path allowlist and rate limits. Paged by Alertmanager on lith1 (ipni/infra). ${local.managed_by}"
   escalation_policy = pagerduty_escalation_policy.ipni.id
 }
 

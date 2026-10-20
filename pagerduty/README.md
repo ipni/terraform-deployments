@@ -8,10 +8,16 @@ Who is on call for IPNI, and where pages go. The paging runbook is in
 | Members | `pagerduty_user` (no team: see [Plan](#plan)) |
 | Schedule **IPNI on-call** | One person at a time, a week each, handing over on Monday at 09:00 UTC, in alias order |
 | Escalation policy **IPNI** | The person on call, then everyone after 15 minutes; runs twice. Was the account's "Default" policy |
-| Service **Service Worker Gateway** | Paged by Cloudflare when inbrowser.link is down (`production_down_page` in `cloudflare/notifications`). Was the "Default Service" that connecting Cloudflare created; its Cloudflare integration isn't managed here |
-| Service **IPNI indexers** | The indexers on sf and sf2, paged by grafana.ipni.io through its **Events API v2** integration |
-| Service **needle** | The routing service on the k3s boxes (sing1, lith1, chic1) and the boxes themselves, paged by the hub's Alertmanager (ipni/infra, lith1) through its **Events API v2** integration |
-| Services **bootstrap**, **content**, **route-origin** | The other priority services on the k3s boxes (kubo bootstrappers; kubo, ipfs-cluster and the pinning Envoy; the Envoy in front of needle), each paged by the same Alertmanager through its own **Events API v2** integration, so the incident names the service. Box-level alerts stay on **needle** |
+| Service **Service Worker Gateway (inbrowser.link)** | Fetches and verifies IPFS content in the visitor's browser. Paged by Cloudflare when inbrowser.link is down (`production_down_page` in `cloudflare/notifications`). Was the "Default Service" that connecting Cloudflare created; its Cloudflare integration isn't managed here |
+| Service **IPNI indexers (cid.contact)** | Map CIDs to the providers that advertise them (storetheindex on sf and sf2). Paged by grafana.ipni.io through its **Events API v2** integration |
+| Service **Delegated routing (needle)** | Answers provider, peer and IPNS lookups for delegated-ipfs.dev from the Amino DHT and cid.contact, on the k3s boxes (sing1, lith1, chic1). Also gets the boxes' own alerts (box down, ZFS pool) |
+| Service **Routing origin (route-origin)** | The Envoy in front of needle: the origin of delegated-ipfs.dev and `route-<box>.ipni.io`, with TLS, the path allowlist and rate limits |
+| Service **IPFS bootstrap peers (bootstrap)** | The kubo nodes new IPFS peers dial to join the network (`bootstrap.ipni.io` and the legacy `bootstrap.libp2p.io` PeerIDs), with WSS for browsers |
+| Service **IPFS website hosting (content)** | kubo and ipfs-cluster pinning the IPFS Project websites on every box, and the `pin.ipni.io` remote pinning API |
+
+The four k3s-box services are each paged by the hub's Alertmanager (ipni/infra,
+lith1) through their own **Events API v2** integration, so the incident names
+the service. Box-level alerts stay on **Delegated routing (needle)**.
 
 State: `s3://ipni-terraform-state/pagerduty/terraform.tfstate`. CI plans and
 applies it with the Cloudflare stacks (same workflow, same approval).
