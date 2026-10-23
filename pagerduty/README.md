@@ -19,7 +19,10 @@ Who is on call for IPNI, and where pages go. The paging runbook is in
 
 The four k3s-box services are each paged by the hub's Alertmanager (ipni/infra,
 lith1) through their own **Events API v2** integration, so the incident names
-the service. Box-level alerts stay on **Delegated routing (needle)**.
+the service. Box-level alerts stay on **Delegated routing (needle)**. So does
+the hub's dead-man's switch: when lith1 stops sending its Watchdog,
+Healthchecks on sing1 pages needle through a second Events API v2
+integration, **Healthchecks (hub dead-man)**.
 
 State: `s3://ipni-terraform-state/pagerduty/terraform.tfstate`. CI plans and
 applies it with the Cloudflare stacks (same workflow, same approval).
@@ -99,6 +102,7 @@ sender reads it:
 |---|---|---|
 | `indexers_integration_key` | grafana.ipni.io (sf, sf2) | Grafana: the PagerDuty contact point |
 | `needle_integration_key` | Alertmanager on lith1 | ipni/infra SOPS: `alertmanager-secrets` → `pagerduty-routing-key` |
+| `needle_healthchecks_integration_key` | Healthchecks on sing1, when lith1's Watchdog stops | Healthchecks: the webhook of the `lith1-alertmanager` check (ipni/infra `docs/03-monitoring.md`, Healthchecks) |
 | `bootstrap_integration_key` | Alertmanager on lith1 | ipni/infra SOPS: `alertmanager-secrets` → `pagerduty-bootstrap-routing-key` |
 | `content_integration_key` | Alertmanager on lith1 | ipni/infra SOPS: `alertmanager-secrets` → `pagerduty-content-routing-key` |
 | `route_origin_integration_key` | Alertmanager on lith1 | ipni/infra SOPS: `alertmanager-secrets` → `pagerduty-route-origin-routing-key` |

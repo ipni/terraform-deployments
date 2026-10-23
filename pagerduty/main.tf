@@ -217,6 +217,24 @@ resource "pagerduty_service_integration" "needle_events" {
   }
 }
 
+# The hub's dead-man's switch: Healthchecks on sing1 pages here when
+# Alertmanager on lith1 stops sending its Watchdog, which is when nothing on
+# lith1 can page. A dead lith1 is a box-level alert, hence needle. Its own key,
+# not Alertmanager's, so the incident says where it came from and either can
+# be rotated alone. Healthchecks sends Events API v2 through a webhook
+# (ipni/infra#204).
+resource "pagerduty_service_integration" "needle_healthchecks" {
+  name    = "Healthchecks (hub dead-man)"
+  service = pagerduty_service.needle.id
+  type    = "events_api_v2_inbound_integration"
+
+  # Recreating it changes the integration key, and Healthchecks would silently
+  # stop paging until its webhook was updated.
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
 # The other priority services on the k3s boxes, each paged by the hub's
 # Alertmanager for its own critical alerts (no ready pod, endpoint and libp2p
 # probes), so an incident says which service is down. Box-level alerts stay on

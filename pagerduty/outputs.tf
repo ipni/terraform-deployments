@@ -12,6 +12,13 @@ output "needle_integration_key" {
   sensitive = true
 }
 
+# Routing key for Healthchecks on sing1 (ipni/infra): the webhook of its
+# lith1-alertmanager check.
+output "needle_healthchecks_integration_key" {
+  value     = pagerduty_service_integration.needle_healthchecks.integration_key
+  sensitive = true
+}
+
 # Routing keys for the hub's Alertmanager (ipni/infra SOPS:
 # alertmanager-secrets -> pagerduty-<service>-routing-key).
 output "bootstrap_integration_key" {
