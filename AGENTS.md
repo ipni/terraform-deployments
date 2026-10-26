@@ -11,7 +11,7 @@ Terraform for IPNI infrastructure:
   `inbrowser.dev` staging), their load balancer pools and monitors, and alerts.
   Applied by CI when a PR is merged.
 - `pagerduty/`: PagerDuty on-call (team, members, schedule, escalation
-  policy, services, the indexers' Events API v2 integration). Applied by CI
+  policy, services, their Events API v2 integrations). Applied by CI
   with the Cloudflare stacks, from the same workflow.
 - `bootstrap/`: the S3 state bucket and the IAM roles CI assumes. Applied by
   hand by humans with IAM rights, never by CI.

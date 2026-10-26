@@ -162,16 +162,17 @@ import {
 }
 
 # The indexers on sf and sf2 (storetheindex behind cid.contact): map CIDs to
-# the providers that advertise them. Paged by grafana.ipni.io through the
-# Events API v2 integration below.
+# the providers that advertise them. Paged by the hub's Alertmanager in
+# ipni/infra (lith1) through the Events API v2 integration below; until it was
+# shut down on 2026-10-26, grafana.ipni.io paged through the same one.
 resource "pagerduty_service" "indexers" {
   name              = "IPNI indexers (cid.contact)"
-  description       = "Map CIDs to the providers that advertise them: storetheindex on sf and sf2, behind cid.contact. Paged by grafana.ipni.io. ${local.managed_by}"
+  description       = "Map CIDs to the providers that advertise them: storetheindex on sf and sf2, behind cid.contact. Paged by Alertmanager on lith1 (ipni/infra). ${local.managed_by}"
   escalation_policy = pagerduty_escalation_policy.ipni.id
   # Urgency follows the event's severity: critical and error page (high),
-  # warning and info don't (low). Alertmanager sends severity=critical, and
-  # Grafana's PagerDuty contact point defaults to it, so every page stays high
-  # urgency; PagerDuty's standards ask for a service that can also send low.
+  # warning and info don't (low). Alertmanager sends severity=critical, so
+  # every page stays high urgency; PagerDuty's standards ask for a service
+  # that can also send low.
   incident_urgency_rule {
     type    = "constant"
     urgency = "severity_based"
@@ -183,8 +184,8 @@ resource "pagerduty_service_integration" "indexers_events" {
   service = pagerduty_service.indexers.id
   type    = "events_api_v2_inbound_integration"
 
-  # Recreating it changes the integration key, and Grafana would silently stop
-  # paging until it was updated.
+  # Recreating it changes the integration key, and Alertmanager would silently
+  # stop paging until it was updated.
   lifecycle {
     prevent_destroy = true
   }

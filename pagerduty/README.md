@@ -9,7 +9,7 @@ Who is on call for IPNI, and where pages go. The paging runbook is in
 | Schedule **IPNI on-call** | One person at a time, a week each, handing over on Monday at 09:00 UTC, in alias order |
 | Escalation policy **IPNI** | The person on call, then everyone after 15 minutes; runs twice. Was the account's "Default" policy. While `local.on_call_override` names an alias (in `main.tf`), the first step pages that person instead of the schedule; set it back to `null` to return to the rotation |
 | Service **Service Worker Gateway (inbrowser.link)** | Fetches and verifies IPFS content in the visitor's browser. Paged by Cloudflare when inbrowser.link is down (`production_down_page` in `cloudflare/notifications`). Was the "Default Service" that connecting Cloudflare created; its Cloudflare integration isn't managed here |
-| Service **IPNI indexers (cid.contact)** | Map CIDs to the providers that advertise them (storetheindex on sf and sf2). Paged by grafana.ipni.io through its **Events API v2** integration |
+| Service **IPNI indexers (cid.contact)** | Map CIDs to the providers that advertise them (storetheindex on sf and sf2). Paged by the hub's Alertmanager through its **Events API v2** integration, which grafana.ipni.io used until it was shut down on 2026-10-26 |
 | Service **Delegated routing (needle)** | Answers provider, peer and IPNS lookups for delegated-ipfs.dev from the Amino DHT and cid.contact, on the k3s boxes (sing1, lith1, chic1). Also gets the boxes' own alerts (box down, ZFS pool) |
 | Service **Routing origin (route-origin)** | The Envoy in front of needle: the origin of delegated-ipfs.dev and `route-<box>.ipni.io`, with TLS, the path allowlist and rate limits |
 | Service **IPFS bootstrap peers (bootstrap)** | The kubo nodes new IPFS peers dial to join the network (`bootstrap.ipni.io` and the legacy `bootstrap.libp2p.io` PeerIDs), with WSS for browsers |
@@ -17,9 +17,9 @@ Who is on call for IPNI, and where pages go. The paging runbook is in
 | Business services | **delegated-ipfs.dev**, **cid.contact**, **inbrowser.link**, **bootstrap.ipni.io**, **IPFS Project websites**: what users reach, each depending on the services behind it (`dependencies.tf`) |
 | Service dependencies | gateway → route-origin → needle → indexers, and content → bootstrap (`dependencies.tf`) |
 
-The four k3s-box services are each paged by the hub's Alertmanager (ipni/infra,
-lith1) through their own **Events API v2** integration, so the incident names
-the service. Box-level alerts stay on **Delegated routing (needle)**. So does
+The indexers and the four k3s-box services are each paged by the hub's
+Alertmanager (ipni/infra, lith1) through their own **Events API v2**
+integration, so the incident names the service. Box-level alerts stay on **Delegated routing (needle)**. So does
 the hub's dead-man's switch: when lith1 stops sending its Watchdog,
 Healthchecks on sing1 pages needle through a second Events API v2
 integration, **Healthchecks (hub dead-man)**.
@@ -46,7 +46,7 @@ Standards). Where each stands:
 | Has a description | `description` on every service |
 | Escalation policy with 2+ unique levels | The **IPNI** policy: the schedule, then everyone |
 | At least 1 API integration | Events API v2 on every service but the gateway, which has Cloudflare's |
-| Does not only send high urgency incidents | `severity_based` urgency on every service but the gateway: Grafana and Alertmanager send `severity=critical`, so their pages stay high. The gateway keeps constant high urgency (what severity Cloudflare sends isn't known) and is **excluded** from this standard |
+| Does not only send high urgency incidents | `severity_based` urgency on every service but the gateway: Alertmanager sends `severity=critical`, so its pages stay high. The gateway keeps constant high urgency (what severity Cloudflare sends isn't known) and is **excluded** from this standard |
 | At least 1 technical service dependency | `pagerduty_service_dependency.technical` |
 | At least 1 business service dependency | `pagerduty_business_service.public` and `pagerduty_service_dependency.business` |
 | At least 1 change integration | **Excluded for every service.** Change events need the AIOps add-on, which the Free plan doesn't have |
@@ -100,7 +100,7 @@ sender reads it:
 
 | Output | Sender | Stored in |
 |---|---|---|
-| `indexers_integration_key` | grafana.ipni.io (sf, sf2) | Grafana: the PagerDuty contact point |
+| `indexers_integration_key` | Alertmanager on lith1 | ipni/infra SOPS: `alertmanager-secrets` → `pagerduty-indexers-routing-key` |
 | `needle_integration_key` | Alertmanager on lith1 | ipni/infra SOPS: `alertmanager-secrets` → `pagerduty-routing-key` |
 | `needle_healthchecks_integration_key` | Healthchecks on sing1, when lith1's Watchdog stops | Healthchecks: the webhook of the `lith1-alertmanager` check (ipni/infra `docs/03-monitoring.md`, Healthchecks) |
 | `bootstrap_integration_key` | Alertmanager on lith1 | ipni/infra SOPS: `alertmanager-secrets` → `pagerduty-bootstrap-routing-key` |
