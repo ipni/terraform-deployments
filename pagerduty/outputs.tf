@@ -1,4 +1,5 @@
-# Routing key for grafana.ipni.io's PagerDuty contact point. Read it with
+# Routing key for the hub's Alertmanager (ipni/infra SOPS:
+# alertmanager-secrets -> pagerduty-indexers-routing-key). Read it with
 # `terraform output -raw indexers_integration_key`; never print it in CI.
 output "indexers_integration_key" {
   value     = pagerduty_service_integration.indexers_events.integration_key
