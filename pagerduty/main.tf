@@ -236,6 +236,23 @@ resource "pagerduty_service_integration" "needle_healthchecks" {
   }
 }
 
+# The dead-man's switch outside our boxes: a hosted heartbeat service that
+# Alertmanager on lith1 also sends its Watchdog to. It pages here when the
+# Watchdog stops, which covers what Healthchecks on sing1 cannot: lith1 and
+# sing1 down together (ipni/infra#209). Its own key, for the same reasons as
+# Healthchecks'. The service sends Events API v2 through a webhook.
+resource "pagerduty_service_integration" "needle_heartbeat" {
+  name    = "Hosted heartbeat (dead-man outside the boxes)"
+  service = pagerduty_service.needle.id
+  type    = "events_api_v2_inbound_integration"
+
+  # Recreating it changes the integration key, and the heartbeat service would
+  # silently stop paging until its webhook was updated.
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
 # The other priority services on the k3s boxes, each paged by the hub's
 # Alertmanager for its own critical alerts (no ready pod, endpoint and libp2p
 # probes), so an incident says which service is down. Box-level alerts stay on

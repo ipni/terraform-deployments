@@ -20,6 +20,13 @@ output "needle_healthchecks_integration_key" {
   sensitive = true
 }
 
+# Routing key for the hosted heartbeat service (ipni/infra#209): the webhook
+# of its check on lith1's Watchdog.
+output "needle_heartbeat_integration_key" {
+  value     = pagerduty_service_integration.needle_heartbeat.integration_key
+  sensitive = true
+}
+
 # Routing keys for the hub's Alertmanager (ipni/infra SOPS:
 # alertmanager-secrets -> pagerduty-<service>-routing-key).
 output "bootstrap_integration_key" {

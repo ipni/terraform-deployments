@@ -22,7 +22,9 @@ Alertmanager (ipni/infra, lith1) through their own **Events API v2**
 integration, so the incident names the service. Box-level alerts stay on **Delegated routing (needle)**. So does
 the hub's dead-man's switch: when lith1 stops sending its Watchdog,
 Healthchecks on sing1 pages needle through a second Events API v2
-integration, **Healthchecks (hub dead-man)**.
+integration, **Healthchecks (hub dead-man)**, and a hosted heartbeat service
+outside our boxes through a third, **Hosted heartbeat (dead-man outside the
+boxes)**, for when lith1 and sing1 are down together (ipni/infra#209).
 
 State: `s3://ipni-terraform-state/pagerduty/terraform.tfstate`. CI plans and
 applies it with the Cloudflare stacks (same workflow, same approval).
@@ -103,6 +105,7 @@ sender reads it:
 | `indexers_integration_key` | Alertmanager on lith1 | ipni/infra SOPS: `alertmanager-secrets` → `pagerduty-indexers-routing-key` |
 | `needle_integration_key` | Alertmanager on lith1 | ipni/infra SOPS: `alertmanager-secrets` → `pagerduty-routing-key` |
 | `needle_healthchecks_integration_key` | Healthchecks on sing1, when lith1's Watchdog stops | Healthchecks: the webhook of the `lith1-alertmanager` check (ipni/infra `docs/03-monitoring.md`, Healthchecks) |
+| `needle_heartbeat_integration_key` | The hosted heartbeat service, when lith1's Watchdog stops arriving there too | The heartbeat service: the webhook of its lith1 Watchdog check (ipni/infra `docs/03-monitoring.md`) |
 | `bootstrap_integration_key` | Alertmanager on lith1 | ipni/infra SOPS: `alertmanager-secrets` → `pagerduty-bootstrap-routing-key` |
 | `content_integration_key` | Alertmanager on lith1 | ipni/infra SOPS: `alertmanager-secrets` → `pagerduty-content-routing-key` |
 | `route_origin_integration_key` | Alertmanager on lith1 | ipni/infra SOPS: `alertmanager-secrets` → `pagerduty-route-origin-routing-key` |
