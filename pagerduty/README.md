@@ -10,21 +10,19 @@ Who is on call for IPNI, and where pages go. The paging runbook is in
 | Escalation policy **IPNI** | The person on call, then everyone after 15 minutes; runs twice. Was the account's "Default" policy. While `local.on_call_override` names an alias (in `main.tf`), the first step pages that person instead of the schedule; set it back to `null` to return to the rotation |
 | Service **Service Worker Gateway (inbrowser.link)** | Fetches and verifies IPFS content in the visitor's browser. Paged by Cloudflare when inbrowser.link is down (`production_down_page` in `cloudflare/notifications`). Was the "Default Service" that connecting Cloudflare created; its Cloudflare integration isn't managed here |
 | Service **IPNI indexers (cid.contact)** | Map CIDs to the providers that advertise them (storetheindex on sf and sf2). Paged by the hub's Alertmanager through its **Events API v2** integration, which grafana.ipni.io used until it was shut down on 2026-10-26 |
-| Service **Delegated routing (needle)** | Answers provider, peer and IPNS lookups for delegated-ipfs.dev from the Amino DHT and cid.contact, on the k3s boxes (sing1, lith1, chic1). Also gets the boxes' own alerts (box down, ZFS pool) |
+| Service **Delegated routing (needle)** | Answers provider, peer and IPNS lookups for delegated-ipfs.dev from the Amino DHT and cid.contact, on the k3s boxes (sing1, lith1, chic1) |
 | Service **Routing origin (route-origin)** | The Envoy in front of needle: the origin of delegated-ipfs.dev and `route-<box>.ipni.io`, with TLS, the path allowlist and rate limits |
 | Service **IPFS bootstrap peers (bootstrap)** | The kubo nodes new IPFS peers dial to join the network (`bootstrap.ipni.io` and the legacy `bootstrap.libp2p.io` PeerIDs), with WSS for browsers |
-| Service **IPNI infrastructure (monitoring)** | The monitoring itself. Paged by the hub's dead-man's switches when Alertmanager on lith1 stops sending its Watchdog: **Healthchecks on sing1 (hub dead-man)** and **Hosted heartbeat (dead-man outside the boxes)**, the only page when lith1 and sing1 are down together (ipni/infra#209) |
+| Service **IPNI infrastructure** | The boxes (sing1, lith1, chic1) and their monitoring. Paged by the hub's Alertmanager for the boxes themselves (box down, ZFS, disk, memory) through its **Events API v2** integration, and by the dead-man's switches when Alertmanager on lith1 stops sending its Watchdog: **Healthchecks on sing1 (hub dead-man)** and **Hosted heartbeat (dead-man outside the boxes)**, the only page when lith1 and sing1 are down together (ipni/infra#209) |
 | Service **IPFS website hosting (content)** | kubo and ipfs-cluster pinning the IPFS Project websites on every box, and the `pin.ipni.io` remote pinning API |
 | Business services | **delegated-ipfs.dev**, **cid.contact**, **inbrowser.link**, **bootstrap.ipni.io**, **IPFS Project websites**: what users reach, each depending on the services behind it (`dependencies.tf`) |
 | Service dependencies | gateway → route-origin → needle → indexers, and content → bootstrap (`dependencies.tf`) |
 
 The indexers and the four k3s-box services are each paged by the hub's
 Alertmanager (ipni/infra, lith1) through their own **Events API v2**
-integration, so the incident names the service. Box-level alerts stay on
-**Delegated routing (needle)**. The hub's dead-man's switches page **IPNI
-infrastructure (monitoring)**, so needle's incidents stay about needle. Until
-Healthchecks on sing1 is switched to its new key, its old integration on
-needle, **Healthchecks (hub dead-man)**, stays; then it is removed.
+integration, so the incident names the service. Box-level alerts and the
+hub's dead-man's switches page **IPNI infrastructure**, so needle's
+incidents stay about needle.
 
 State: `s3://ipni-terraform-state/pagerduty/terraform.tfstate`. CI plans and
 applies it with the Cloudflare stacks (same workflow, same approval).
@@ -49,8 +47,8 @@ Standards). Where each stands:
 | Escalation policy with 2+ unique levels | The **IPNI** policy: the schedule, then everyone |
 | At least 1 API integration | Events API v2 on every service but the gateway, which has Cloudflare's |
 | Does not only send high urgency incidents | `severity_based` urgency on every service but the gateway: Alertmanager sends `severity=critical`, so its pages stay high. The gateway keeps constant high urgency (what severity Cloudflare sends isn't known) and is **excluded** from this standard |
-| At least 1 technical service dependency | `pagerduty_service_dependency.technical`. **IPNI infrastructure (monitoring)** has none: no service fails when monitoring does. Exclude it in the dashboard |
-| At least 1 business service dependency | `pagerduty_business_service.public` and `pagerduty_service_dependency.business`. Not **IPNI infrastructure (monitoring)**, which users don't reach; exclude it too |
+| At least 1 technical service dependency | `pagerduty_service_dependency.technical`. **IPNI infrastructure** has none: no service fails when monitoring does. Exclude it in the dashboard |
+| At least 1 business service dependency | `pagerduty_business_service.public` and `pagerduty_service_dependency.business`. Not **IPNI infrastructure**, which users don't reach; exclude it too |
 | At least 1 change integration | **Excluded for every service.** Change events need the AIOps add-on, which the Free plan doesn't have |
 | Has an extension or add-on (e.g. Slack) | **Not met yet.** It needs the PagerDuty Slack app in the Filecoin Slack workspace (approved by its admins), then a `pagerduty_slack_connection` per service to #ipni-alerts |
 
@@ -104,9 +102,9 @@ sender reads it:
 |---|---|---|
 | `indexers_integration_key` | Alertmanager on lith1 | ipni/infra SOPS: `alertmanager-secrets` → `pagerduty-indexers-routing-key` |
 | `needle_integration_key` | Alertmanager on lith1 | ipni/infra SOPS: `alertmanager-secrets` → `pagerduty-routing-key` |
+| `infra_integration_key` | Alertmanager on lith1, box-level alerts | ipni/infra SOPS: `alertmanager-secrets` → `pagerduty-infra-routing-key` |
 | `infra_healthchecks_integration_key` | Healthchecks on sing1, when lith1's Watchdog stops | Healthchecks: the webhook of the `lith1-alertmanager` check (ipni/infra `docs/03-monitoring.md`, Healthchecks) |
 | `infra_heartbeat_integration_key` | The hosted heartbeat, when lith1's Watchdog stops arriving there too | The hosted check's webhook (ipni/infra `docs/03-monitoring.md`, Hosted heartbeat) |
-| `needle_healthchecks_integration_key` | Old key of Healthchecks on sing1, until it is switched to `infra_healthchecks_integration_key` | Removed with its integration afterwards |
 | `bootstrap_integration_key` | Alertmanager on lith1 | ipni/infra SOPS: `alertmanager-secrets` → `pagerduty-bootstrap-routing-key` |
 | `content_integration_key` | Alertmanager on lith1 | ipni/infra SOPS: `alertmanager-secrets` → `pagerduty-content-routing-key` |
 | `route_origin_integration_key` | Alertmanager on lith1 | ipni/infra SOPS: `alertmanager-secrets` → `pagerduty-route-origin-routing-key` |

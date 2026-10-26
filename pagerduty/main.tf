@@ -193,11 +193,11 @@ resource "pagerduty_service_integration" "indexers_events" {
 
 # needle, the delegated routing server on the k3s boxes (sing1, lith1, chic1)
 # behind delegated-ipfs.dev: answers provider, peer and IPNS lookups from the
-# Amino DHT and cid.contact. Also the boxes themselves (box down, ZFS pool).
-# Paged by the hub's Alertmanager in ipni/infra (lith1).
+# Amino DHT and cid.contact. Paged by the hub's Alertmanager in ipni/infra
+# (lith1); the boxes themselves page infra.
 resource "pagerduty_service" "needle" {
   name              = "Delegated routing (needle)"
-  description       = "Answers provider, peer and IPNS lookups for delegated-ipfs.dev from the Amino DHT and cid.contact, on sing1, lith1 and chic1. Also gets the boxes' own alerts (box down, ZFS pool). Paged by Alertmanager on lith1 (ipni/infra). ${local.managed_by}"
+  description       = "Answers provider, peer and IPNS lookups for delegated-ipfs.dev from the Amino DHT and cid.contact, on sing1, lith1 and chic1. Paged by Alertmanager on lith1 (ipni/infra). ${local.managed_by}"
   escalation_policy = pagerduty_escalation_policy.ipni.id
   # Urgency follows the event's severity (see indexers).
   incident_urgency_rule {
@@ -218,33 +218,31 @@ resource "pagerduty_service_integration" "needle_events" {
   }
 }
 
-# The hub's first dead-man's switch, on needle until Healthchecks on sing1
-# uses infra_healthchecks below. Then remove it: drop prevent_destroy in one
-# PR, delete the resource in the next (ipni/infra#209).
-resource "pagerduty_service_integration" "needle_healthchecks" {
-  name    = "Healthchecks (hub dead-man)"
-  service = pagerduty_service.needle.id
-  type    = "events_api_v2_inbound_integration"
-
-  # Recreating it changes the integration key, and Healthchecks would silently
-  # stop paging until its webhook was updated.
-  lifecycle {
-    prevent_destroy = true
-  }
-}
-
-# The monitoring itself, apart from any one service: paged when the hub on
-# lith1 can no longer alert, so nothing else can page. Its dead-man's switches
-# page here rather than on needle, so needle's incidents stay about needle.
-# Box-level alerts (box down, ZFS, disk) stay on needle for now.
+# The boxes and their monitoring, apart from any one service: the hub's
+# Alertmanager pages here for the boxes themselves (box down, ZFS, disk,
+# memory), and the dead-man's switches when the hub on lith1 can no longer
+# alert. Keeps needle's incidents about needle.
 resource "pagerduty_service" "infra" {
-  name              = "IPNI infrastructure (monitoring)"
-  description       = "The monitoring of the IPNI boxes. Paged when Alertmanager on lith1 stops sending its Watchdog, by Healthchecks on sing1 and by a hosted heartbeat outside the boxes (ipni/infra). ${local.managed_by}"
+  name              = "IPNI infrastructure"
+  description       = "The IPNI boxes (sing1, lith1, chic1) and their monitoring. Paged by Alertmanager on lith1 for the boxes themselves (box down, ZFS, disk, memory), and when Alertmanager stops sending its Watchdog, by Healthchecks on sing1 and by a hosted heartbeat outside the boxes (ipni/infra). ${local.managed_by}"
   escalation_policy = pagerduty_escalation_policy.ipni.id
   # Urgency follows the event's severity (see indexers); both send critical.
   incident_urgency_rule {
     type    = "constant"
     urgency = "severity_based"
+  }
+}
+
+# The hub's Alertmanager, for box-level alerts.
+resource "pagerduty_service_integration" "infra_events" {
+  name    = "Events API v2"
+  service = pagerduty_service.infra.id
+  type    = "events_api_v2_inbound_integration"
+
+  # Recreating it changes the integration key, and Alertmanager would silently
+  # stop paging until ipni/infra's SOPS secret was updated.
+  lifecycle {
+    prevent_destroy = true
   }
 }
 
