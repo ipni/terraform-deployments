@@ -218,12 +218,9 @@ resource "pagerduty_service_integration" "needle_events" {
   }
 }
 
-# The hub's dead-man's switch: Healthchecks on sing1 pages here when
-# Alertmanager on lith1 stops sending its Watchdog, which is when nothing on
-# lith1 can page. A dead lith1 is a box-level alert, hence needle. Its own key,
-# not Alertmanager's, so the incident says where it came from and either can
-# be rotated alone. Healthchecks sends Events API v2 through a webhook
-# (ipni/infra#204).
+# The hub's first dead-man's switch, on needle until Healthchecks on sing1
+# uses infra_healthchecks below. Then remove it: drop prevent_destroy in one
+# PR, delete the resource in the next (ipni/infra#209).
 resource "pagerduty_service_integration" "needle_healthchecks" {
   name    = "Healthchecks (hub dead-man)"
   service = pagerduty_service.needle.id
@@ -231,6 +228,48 @@ resource "pagerduty_service_integration" "needle_healthchecks" {
 
   # Recreating it changes the integration key, and Healthchecks would silently
   # stop paging until its webhook was updated.
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+# The monitoring itself, apart from any one service: paged when the hub on
+# lith1 can no longer alert, so nothing else can page. Its dead-man's switches
+# page here rather than on needle, so needle's incidents stay about needle.
+# Box-level alerts (box down, ZFS, disk) stay on needle for now.
+resource "pagerduty_service" "infra" {
+  name              = "IPNI infrastructure (monitoring)"
+  description       = "The monitoring of the IPNI boxes. Paged when Alertmanager on lith1 stops sending its Watchdog, by Healthchecks on sing1 and by a hosted heartbeat outside the boxes (ipni/infra). ${local.managed_by}"
+  escalation_policy = pagerduty_escalation_policy.ipni.id
+  # Urgency follows the event's severity (see indexers); both send critical.
+  incident_urgency_rule {
+    type    = "constant"
+    urgency = "severity_based"
+  }
+}
+
+# Healthchecks on sing1 pages here when lith1's Watchdog stops: lith1 is down
+# or cannot alert (ipni/infra#204). Events API v2 through a webhook.
+resource "pagerduty_service_integration" "infra_healthchecks" {
+  name    = "Healthchecks on sing1 (hub dead-man)"
+  service = pagerduty_service.infra.id
+  type    = "events_api_v2_inbound_integration"
+
+  # Recreating it changes the integration key, and Healthchecks would silently
+  # stop paging until its webhook was updated.
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+# A hosted heartbeat outside our boxes gets the same Watchdog and pages here
+# when it stops: the only page when lith1 and sing1 are down together
+# (ipni/infra#209). Its own key, so the incident says which switch fired.
+resource "pagerduty_service_integration" "infra_heartbeat" {
+  name    = "Hosted heartbeat (dead-man outside the boxes)"
+  service = pagerduty_service.infra.id
+  type    = "events_api_v2_inbound_integration"
+
   lifecycle {
     prevent_destroy = true
   }

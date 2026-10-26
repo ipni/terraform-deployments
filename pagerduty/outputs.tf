@@ -13,10 +13,22 @@ output "needle_integration_key" {
   sensitive = true
 }
 
-# Routing key for Healthchecks on sing1 (ipni/infra): the webhook of its
-# lith1-alertmanager check.
+# Old routing key for Healthchecks on sing1, on needle. Goes with
+# needle_healthchecks once sing1 uses infra_healthchecks_integration_key.
 output "needle_healthchecks_integration_key" {
   value     = pagerduty_service_integration.needle_healthchecks.integration_key
+  sensitive = true
+}
+
+# Routing keys for the dead-man's switches (ipni/infra docs/03-monitoring.md,
+# Healthchecks): the webhook of each one's lith1-alertmanager check.
+output "infra_healthchecks_integration_key" {
+  value     = pagerduty_service_integration.infra_healthchecks.integration_key
+  sensitive = true
+}
+
+output "infra_heartbeat_integration_key" {
+  value     = pagerduty_service_integration.infra_heartbeat.integration_key
   sensitive = true
 }
 
