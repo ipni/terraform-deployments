@@ -13,10 +13,10 @@ output "needle_integration_key" {
   sensitive = true
 }
 
-# Old routing key for Healthchecks on sing1, on needle. Goes with
-# needle_healthchecks once sing1 uses infra_healthchecks_integration_key.
-output "needle_healthchecks_integration_key" {
-  value     = pagerduty_service_integration.needle_healthchecks.integration_key
+# Routing key for the hub's Alertmanager, box-level alerts (ipni/infra SOPS:
+# alertmanager-secrets -> pagerduty-infra-routing-key).
+output "infra_integration_key" {
+  value     = pagerduty_service_integration.infra_events.integration_key
   sensitive = true
 }
 
