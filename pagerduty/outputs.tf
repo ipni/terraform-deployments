@@ -49,6 +49,13 @@ output "route_origin_integration_key" {
   sensitive = true
 }
 
+# Routing key ProbeLab sends its alerts with. Hand it to them privately, never
+# in an issue or chat.
+output "probelab_integration_key" {
+  value     = pagerduty_service_integration.probelab_events.integration_key
+  sensitive = true
+}
+
 # For the Cloudflare PagerDuty destination, connected to this service.
 output "swg_service_id" {
   value = pagerduty_service.swg.id

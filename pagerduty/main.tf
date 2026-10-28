@@ -349,3 +349,32 @@ resource "pagerduty_service_integration" "route_origin_events" {
     prevent_destroy = true
   }
 }
+
+# ProbeLab (probelab.io) measures our public services from outside our
+# network, and saw the 2026-10-16 bootstrap incident before we did. Their
+# alerts page here, apart from the hub's, so an incident says it came from
+# outside. Like infra, nothing fails when it does and users don't reach it, so
+# it has no dependencies.
+resource "pagerduty_service" "probelab" {
+  name              = "ProbeLab alerts"
+  description       = "Alerts from ProbeLab's measurements of IPNI's public services (bootstrap peers, delegated routing, cid.contact) from outside our network. Paged by ProbeLab. ${local.managed_by}"
+  escalation_policy = pagerduty_escalation_policy.ipni.id
+  # Urgency follows the event's severity (see indexers): ProbeLab sends
+  # critical or error to page, warning or info to only open an incident.
+  incident_urgency_rule {
+    type    = "constant"
+    urgency = "severity_based"
+  }
+}
+
+resource "pagerduty_service_integration" "probelab_events" {
+  name    = "Events API v2"
+  service = pagerduty_service.probelab.id
+  type    = "events_api_v2_inbound_integration"
+
+  # Recreating it changes the integration key, and ProbeLab would silently
+  # stop paging until we sent them the new one.
+  lifecycle {
+    prevent_destroy = true
+  }
+}
