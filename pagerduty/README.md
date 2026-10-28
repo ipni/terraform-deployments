@@ -15,6 +15,7 @@ Who is on call for IPNI, and where pages go. The paging runbook is in
 | Service **IPFS bootstrap peers (bootstrap)** | The kubo nodes new IPFS peers dial to join the network (`bootstrap.ipni.io` and the legacy `bootstrap.libp2p.io` PeerIDs), with WSS for browsers |
 | Service **IPNI infrastructure** | The boxes (sing1, lith1, chic1) and their monitoring. Paged by the hub's Alertmanager for the boxes themselves (box down, ZFS, disk, memory) through its **Events API v2** integration, and by the dead-man's switches when Alertmanager on lith1 stops sending its Watchdog: **Healthchecks on sing1 (hub dead-man)** and **Hosted heartbeat (dead-man outside the boxes)**, the only page when lith1 and sing1 are down together (ipni/infra#209) |
 | Service **IPFS website hosting (content)** | kubo and ipfs-cluster pinning the IPFS Project websites on every box, and the `pin.ipni.io` remote pinning API |
+| Service **ProbeLab alerts** | Alerts from [ProbeLab](https://probelab.io)'s measurements of our public services from outside our network, through its own **Events API v2** integration, so an incident says it came from outside |
 | Business services | **delegated-ipfs.dev**, **cid.contact**, **inbrowser.link**, **bootstrap.ipni.io**, **IPFS Project websites**: what users reach, each depending on the services behind it (`dependencies.tf`) |
 | Service dependencies | gateway → route-origin → needle → indexers, and content → bootstrap (`dependencies.tf`) |
 
@@ -47,8 +48,8 @@ Standards). Where each stands:
 | Escalation policy with 2+ unique levels | The **IPNI** policy: the schedule, then everyone |
 | At least 1 API integration | Events API v2 on every service but the gateway, which has Cloudflare's |
 | Does not only send high urgency incidents | `severity_based` urgency on every service but the gateway: Alertmanager sends `severity=critical`, so its pages stay high. The gateway keeps constant high urgency (what severity Cloudflare sends isn't known) and is **excluded** from this standard |
-| At least 1 technical service dependency | `pagerduty_service_dependency.technical`. **IPNI infrastructure** has none: no service fails when monitoring does. Exclude it in the dashboard |
-| At least 1 business service dependency | `pagerduty_business_service.public` and `pagerduty_service_dependency.business`. Not **IPNI infrastructure**, which users don't reach; exclude it too |
+| At least 1 technical service dependency | `pagerduty_service_dependency.technical`. **IPNI infrastructure** and **ProbeLab alerts** have none: no service fails when monitoring does. Exclude them in the dashboard |
+| At least 1 business service dependency | `pagerduty_business_service.public` and `pagerduty_service_dependency.business`. Not **IPNI infrastructure** or **ProbeLab alerts**, which users don't reach; exclude them too |
 | At least 1 change integration | **Excluded for every service.** Change events need the AIOps add-on, which the Free plan doesn't have |
 | Has an extension or add-on (e.g. Slack) | **Not met yet.** It needs the PagerDuty Slack app in the Filecoin Slack workspace (approved by its admins), then a `pagerduty_slack_connection` per service to #ipni-alerts |
 
@@ -105,6 +106,7 @@ sender reads it:
 | `infra_integration_key` | Alertmanager on lith1, box-level alerts | ipni/infra SOPS: `alertmanager-secrets` → `pagerduty-infra-routing-key` |
 | `infra_healthchecks_integration_key` | Healthchecks on sing1, when lith1's Watchdog stops | Healthchecks: the webhook of the `lith1-alertmanager` check (ipni/infra `docs/03-monitoring.md`, Healthchecks) |
 | `infra_heartbeat_integration_key` | The hosted heartbeat, when lith1's Watchdog stops arriving there too | The hosted check's webhook (ipni/infra `docs/03-monitoring.md`, Hosted heartbeat) |
+| `probelab_integration_key` | ProbeLab | ProbeLab's alerting; send it to them privately |
 | `bootstrap_integration_key` | Alertmanager on lith1 | ipni/infra SOPS: `alertmanager-secrets` → `pagerduty-bootstrap-routing-key` |
 | `content_integration_key` | Alertmanager on lith1 | ipni/infra SOPS: `alertmanager-secrets` → `pagerduty-content-routing-key` |
 | `route_origin_integration_key` | Alertmanager on lith1 | ipni/infra SOPS: `alertmanager-secrets` → `pagerduty-route-origin-routing-key` |
