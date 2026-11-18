@@ -17,7 +17,7 @@
 #      old project first. Then delete the old project.
 
 locals {
-  cidstats_cutover = false
+  cidstats_cutover = true
 
   cidstats_deployment_config = {
     always_use_latest_compatibility_date = false
