@@ -124,10 +124,13 @@ resource "cloudflare_dns_record" "cidstats" {
   zone_id = local.zone_id
   name    = "cidstats.ipni.io"
   type    = "CNAME"
-  content = local.cidstats_cutover ? cloudflare_pages_project.cidstats[0].subdomain : "cidstats.pages.dev"
+  content = local.cidstats_cutover ? cloudflare_pages_project.cidstats.subdomain : "cidstats.pages.dev"
   proxied = true
   ttl     = 1
   comment = local.managed_by
+
+  # Add the custom domain to the new project before sending traffic to it.
+  depends_on = [cloudflare_pages_domain.cidstats]
 }
 
 # A hostname in the secret that has no record here would be silently ignored.

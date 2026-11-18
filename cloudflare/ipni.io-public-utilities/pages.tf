@@ -1,19 +1,23 @@
-# The cidstats site (github.com/ipni/cidstats), formerly the Pages project of
-# the same name in Alex@ipfs.io's Account. Project settings only: Pages builds
-# and deploys the site itself on every push to the repo.
+# The cidstats site (github.com/ipni/cidstats), moving from the Pages project
+# "cidstats" in Alex@ipfs.io's Account. Project settings only: Pages builds and
+# deploys the site itself on every push to the repo.
 #
-# Created at the cutover, after the registrar transfer. A GitHub repository can
-# only be connected to Pages projects in one Cloudflare account, so Cloudflare
-# refuses this project (error 8000093) while the old one exists: delete the old
-# project first, then apply. cidstats.ipni.io is down in between. A project
-# without the repository is no way around it: a direct-upload project can't be
-# connected to Git later.
+# A GitHub repository can only be connected to Pages projects in one Cloudflare
+# account (error 8000093 otherwise). The repository was disconnected from the
+# old project, which keeps serving its last deployment on cidstats.pages.dev
+# and cidstats.ipni.io. This project gets its own name, so it doesn't depend on
+# Cloudflare freeing "cidstats".
 #
-# Its pages.dev name is cidstats.pages.dev again if Cloudflare has freed it,
-# else a generated one; the CNAME in dns.tf follows it.
+# In two steps, so cidstats.ipni.io keeps working:
+#   1. this project is created and builds from the repo, on
+#      ipni-cidstats.pages.dev (cidstats_cutover = false);
+#   2. after the registrar transfer, set cidstats_cutover to true: this adds
+#      cidstats.ipni.io as its custom domain, then points the CNAME at it
+#      (dns.tf). If Cloudflare refuses the domain as in use, remove it from the
+#      old project first. Then delete the old project.
 
 locals {
-  cidstats_cutover = true
+  cidstats_cutover = false
 
   cidstats_deployment_config = {
     always_use_latest_compatibility_date = false
@@ -26,10 +30,8 @@ locals {
 }
 
 resource "cloudflare_pages_project" "cidstats" {
-  count = local.cidstats_cutover ? 1 : 0
-
   account_id        = local.account_id
-  name              = "cidstats"
+  name              = "ipni-cidstats"
   production_branch = "main"
 
   # Static files from the repo root, no build step.
@@ -65,6 +67,6 @@ resource "cloudflare_pages_domain" "cidstats" {
   count = local.cidstats_cutover ? 1 : 0
 
   account_id   = local.account_id
-  project_name = cloudflare_pages_project.cidstats[0].name
+  project_name = cloudflare_pages_project.cidstats.name
   name         = "cidstats.ipni.io"
 }
