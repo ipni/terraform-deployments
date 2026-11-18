@@ -109,16 +109,15 @@ resource "cloudflare_dns_record" "ns" {
   comment = local.managed_by
 }
 
-# The filecoin-redirect Pages project in this account (pages.tf). The old
-# zone points at the old project's filecoin-redirect.pages.dev; this one at
-# the new project, which only matters once this zone is live.
+# The filecoin-redirect Pages project: the old project's until the cutover,
+# then the one in this account (pages.tf).
 resource "cloudflare_dns_record" "filecoin_redirect" {
-  for_each = toset(["direct.cid.contact", "fetch.cid.contact"])
+  for_each = toset(local.filecoin_redirect_hostnames)
 
   zone_id = local.zone_id
   name    = each.key
   type    = "CNAME"
-  content = cloudflare_pages_project.filecoin_redirect.subdomain
+  content = local.filecoin_redirect_cutover ? cloudflare_pages_project.filecoin_redirect[0].subdomain : "filecoin-redirect.pages.dev"
   proxied = true
   ttl     = 1
   comment = local.managed_by

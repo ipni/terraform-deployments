@@ -3,20 +3,26 @@
 # of the same name in Alex@ipfs.io's Account. Project settings only: Pages
 # builds and deploys the site itself on every push to the repo.
 #
-# The Cloudflare Pages GitHub app must be able to read ipni/filecoin-redirect
-# from IPFS Public Utilities, or creating the project fails. It can today:
-# the account's build API reads the repo's wrangler.toml.
+# Not created until the cutover. A GitHub repository can only be connected to
+# Pages projects in one Cloudflare account, so Cloudflare refuses this project
+# (error 8000093) while the old one exists. A project without the repository
+# is no way around it: a direct-upload project can't be connected to Git later.
 #
-# The name `filecoin-redirect.pages.dev` belongs to the old project, so this
-# one gets a generated one (`filecoin-redirect-<random>.pages.dev`); the
-# CNAMEs in dns.tf follow it.
+# Until then, direct. and fetch.cid.contact point at the old project's
+# filecoin-redirect.pages.dev, as in the old zone. At the cutover, after the
+# nameserver change:
+#   1. delete the old project in Alex@ipfs.io's Account (direct. and
+#      fetch.cid.contact are down until step 2 is applied);
+#   2. set filecoin_redirect_cutover to true: this creates the project,
+#      connected to the repository, with both hostnames as its custom domains,
+#      and points the CNAMEs at it. Its pages.dev name is
+#      filecoin-redirect.pages.dev again if Cloudflare has freed it, else a
+#      generated one.
 
 locals {
-  # Off until the cutover: direct.cid.contact and fetch.cid.contact are custom
-  # domains of the old project, and a hostname can only belong to one project.
-  # At the nameserver change: remove them from the old project, then set this
-  # to true.
-  filecoin_redirect_custom_domains = false
+  filecoin_redirect_cutover = false
+
+  filecoin_redirect_hostnames = ["direct.cid.contact", "fetch.cid.contact"]
 
   # The repo's wrangler.toml sets these on every deployment (the dashboard
   # shows them read-only). They are set here too so the project starts with
@@ -36,6 +42,8 @@ locals {
 }
 
 resource "cloudflare_pages_project" "filecoin_redirect" {
+  count = local.filecoin_redirect_cutover ? 1 : 0
+
   account_id        = local.account_id
   name              = "filecoin-redirect"
   production_branch = "main"
@@ -62,12 +70,10 @@ resource "cloudflare_pages_project" "filecoin_redirect" {
       repo_id                        = "1410645470"
       production_branch              = "main"
       production_deployments_enabled = true
-      # The old project already comments on every PR; turn this on when it is
-      # deleted, so PRs don't get two comments.
-      pr_comments_enabled        = false
-      preview_deployment_setting = "all"
-      preview_branch_includes    = ["*"]
-      path_includes              = ["*"]
+      pr_comments_enabled            = true
+      preview_deployment_setting     = "all"
+      preview_branch_includes        = ["*"]
+      path_includes                  = ["*"]
     }
   }
 
@@ -86,9 +92,9 @@ resource "cloudflare_pages_project" "filecoin_redirect" {
 }
 
 resource "cloudflare_pages_domain" "filecoin_redirect" {
-  for_each = local.filecoin_redirect_custom_domains ? toset(["direct.cid.contact", "fetch.cid.contact"]) : toset([])
+  for_each = local.filecoin_redirect_cutover ? toset(local.filecoin_redirect_hostnames) : toset([])
 
   account_id   = local.account_id
-  project_name = cloudflare_pages_project.filecoin_redirect.name
+  project_name = cloudflare_pages_project.filecoin_redirect[0].name
   name         = each.key
 }

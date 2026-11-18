@@ -11,7 +11,7 @@ Terraform for IPNI-owned config in the shared Cloudflare account
 | `notifications/` | Cloudflare Notifications (alerts) for the gateway, sent to Slack and email |
 | `ipni.io/` | The parts of the `ipni.io` zone managed here: the IPNI monitoring hostnames ([ipni/infra](https://github.com/ipni/infra), `docs/03-monitoring.md`), and the zone's Origin and Configuration Rules |
 | `ipni.io-public-utilities/` | The `ipni.io` zone in *IPFS Public Utilities*, where it is moving from *Alex@ipfs.io's Account*: the zone, every DNS record, its Origin and Configuration Rules and changed settings, and the `cidstats` Pages project, mirrored from the old account. Pending until the registration moves; until then, change a record in both places |
-| `cid.contact-public-utilities/` | The `cid.contact` zone in *IPFS Public Utilities*, where it is moving from *Alex@ipfs.io's Account*: the zone, every DNS record, its changed settings, and the `filecoin-redirect` Pages project, mirrored from the old account. Pending until the nameservers at Squarespace change; until then, change a record in both places |
+| `cid.contact-public-utilities/` | The `cid.contact` zone in *IPFS Public Utilities*, where it is moving from *Alex@ipfs.io's Account*: the zone, every DNS record, its changed settings, and the `filecoin-redirect` Pages project (created at the cutover, see `pages.tf`), mirrored from the old account. Pending until the nameservers at Squarespace change; until then, change a record in both places |
 | `modules/swg-zone/` | Shared zone config: DNS, zone settings, rulesets, load balancers, Pages custom domain, health check |
 | `scripts/export.sh` | Read-only export of a live zone into `scripts/generated/` (git-ignored) |
 

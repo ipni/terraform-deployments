@@ -14,6 +14,6 @@ output "name_servers" {
 }
 
 output "filecoin_redirect_subdomain" {
-  description = "pages.dev hostname of the filecoin-redirect project in this account, the target of direct. and fetch.cid.contact."
-  value       = cloudflare_pages_project.filecoin_redirect.subdomain
+  description = "pages.dev hostname of the filecoin-redirect project in this account (null until the cutover), the target of direct. and fetch.cid.contact."
+  value       = one(cloudflare_pages_project.filecoin_redirect[*].subdomain)
 }
