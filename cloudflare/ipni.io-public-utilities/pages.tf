@@ -1,23 +1,19 @@
-# The cidstats site (github.com/ipni/cidstats), mirrored from the Pages
-# project of the same name in Alex@ipfs.io's Account. Project settings only:
-# Pages builds and deploys the site itself on every push to the repo.
+# The cidstats site (github.com/ipni/cidstats), formerly the Pages project of
+# the same name in Alex@ipfs.io's Account. Project settings only: Pages builds
+# and deploys the site itself on every push to the repo.
 #
-# Not created until the cutover. A GitHub repository can only be connected to
-# Pages projects in one Cloudflare account, so Cloudflare refuses this project
-# (error 8000093) while the old one exists. A project without the repository
-# is no way around it: a direct-upload project can't be connected to Git later.
+# Created at the cutover, after the registrar transfer. A GitHub repository can
+# only be connected to Pages projects in one Cloudflare account, so Cloudflare
+# refuses this project (error 8000093) while the old one exists: delete the old
+# project first, then apply. cidstats.ipni.io is down in between. A project
+# without the repository is no way around it: a direct-upload project can't be
+# connected to Git later.
 #
-# Until then, cidstats.ipni.io points at the old project's cidstats.pages.dev,
-# as in the old zone. At the cutover, after the registrar transfer:
-#   1. delete the old project in Alex@ipfs.io's Account (cidstats.ipni.io is
-#      down until step 2 is applied);
-#   2. set cidstats_cutover to true: this creates the project, connected to the
-#      repository, with cidstats.ipni.io as its custom domain, and points the
-#      CNAME at it. Its pages.dev name is cidstats.pages.dev again if Cloudflare
-#      has freed it, else a generated one.
+# Its pages.dev name is cidstats.pages.dev again if Cloudflare has freed it,
+# else a generated one; the CNAME in dns.tf follows it.
 
 locals {
-  cidstats_cutover = false
+  cidstats_cutover = true
 
   cidstats_deployment_config = {
     always_use_latest_compatibility_date = false
