@@ -29,6 +29,10 @@ locals {
   }
 }
 
+# Provider 5.26.0 bug on create: its response leaves out build_config and
+# compatibility_flags, so the create failed as an "inconsistent result" and left
+# the project tainted (untainted by hand). The next apply writes the same values
+# again, an update with no effect in Cloudflare.
 resource "cloudflare_pages_project" "cidstats" {
   account_id        = local.account_id
   name              = "ipni-cidstats"
