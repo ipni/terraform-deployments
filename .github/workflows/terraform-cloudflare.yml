@@ -65,9 +65,10 @@ env:
   AWS_REGION: us-east-2
   # Apply order: the zones and notifications read pool IDs from load-balancing;
   # notifications goes last so it can also use IDs the zones create. ipni.io,
-  # ipni.io-public-utilities and pagerduty depend on none of them. Every stack
-  # is cloudflare/<stack>, except pagerduty (pagerduty/).
-  STACK_ORDER: load-balancing inbrowser.link inbrowser.dev notifications ipni.io ipni.io-public-utilities pagerduty
+  # ipni.io-public-utilities, cid.contact-public-utilities and pagerduty depend
+  # on none of them. Every stack is cloudflare/<stack>, except pagerduty
+  # (pagerduty/).
+  STACK_ORDER: load-balancing inbrowser.link inbrowser.dev notifications ipni.io ipni.io-public-utilities cid.contact-public-utilities pagerduty
 
 jobs:
   # Fails a PR or push that adds a secret anywhere in its commits; nothing is
@@ -165,6 +166,7 @@ jobs:
       TF_VAR_alert_emails: ${{ secrets.SWG_ALERT_EMAILS }}
       TF_VAR_pagerduty_id: ${{ vars.CLOUDFLARE_PAGERDUTY_ID }}
       TF_VAR_ipni_io_addresses: ${{ secrets.IPNI_IO_ADDRESSES }}
+      TF_VAR_cid_contact_addresses: ${{ secrets.CID_CONTACT_ADDRESSES }}
       # Read-only PagerDuty API key, and the members (names, emails) only for
       # the pagerduty stack.
       PAGERDUTY_TOKEN: ${{ matrix.stack == 'pagerduty' && secrets.PAGERDUTY_TOKEN_READ || '' }}
@@ -388,6 +390,7 @@ jobs:
       TF_VAR_alert_emails: ${{ secrets.SWG_ALERT_EMAILS }}
       TF_VAR_pagerduty_id: ${{ vars.CLOUDFLARE_PAGERDUTY_ID }}
       TF_VAR_ipni_io_addresses: ${{ secrets.IPNI_IO_ADDRESSES }}
+      TF_VAR_cid_contact_addresses: ${{ secrets.CID_CONTACT_ADDRESSES }}
       GH_TOKEN: ${{ github.token }}
       STACKS: ${{ needs.changes.outputs.stacks }}
     steps:
