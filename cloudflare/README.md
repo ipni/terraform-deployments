@@ -10,6 +10,7 @@ Terraform for IPNI-owned config in the shared Cloudflare account
 | `load-balancing/` | Account-level load balancer pools and health monitors used by both zones |
 | `notifications/` | Cloudflare Notifications (alerts) for the gateway, sent to Slack and email |
 | `ipni.io/` | The parts of the `ipni.io` zone managed here: the IPNI monitoring hostnames ([ipni/infra](https://github.com/ipni/infra), `docs/03-monitoring.md`), and the zone's Origin and Configuration Rules |
+| `ipni.io-public-utilities/` | The `ipni.io` zone in *IPFS Public Utilities*, where it is moving from *Alex@ipfs.io's Account*: the zone, every DNS record, its Origin and Configuration Rules and changed settings, and the `cidstats` Pages project, mirrored from the old account. Pending until the registration moves; until then, change a record in both places |
 | `modules/swg-zone/` | Shared zone config: DNS, zone settings, rulesets, load balancers, Pages custom domain, health check |
 | `scripts/export.sh` | Read-only export of a live zone into `scripts/generated/` (git-ignored) |
 
@@ -63,6 +64,8 @@ printf '{"rainbow_origins": %s}\n' "$(op read "$note/RAINBOW_ORIGINS")" \
 printf '{"alert_emails": %s, "slack_webhook_url": "%s"}\n' \
   "$(op read "$note/SWG_ALERT_EMAILS")" "$(op read "$note/SWG_ALERTS_SLACK_WEBHOOK_URL")" \
   > notifications/secrets.auto.tfvars.json
+printf '{"ipni_io_addresses": %s}\n' "$(op read "$note/IPNI_IO_ADDRESSES")" \
+  > ipni.io-public-utilities/secrets.auto.tfvars.json
 ```
 
 Without them, `plan` stops and asks for the missing variables instead of
@@ -235,7 +238,8 @@ Merge:  gitleaks -> changes -> to-apply -> apply (waits for a code owner)
    changes", the apply is skipped and there is nothing to approve (a dashboard
    change made since the PR was planned is then caught by the nightly drift
    check). Then, for each affected stack, in the order `load-balancing`,
-   `inbrowser.link`, `inbrowser.dev`, `notifications`, `ipni.io`, then
+   `inbrowser.link`, `inbrowser.dev`, `notifications`, `ipni.io`,
+   `ipni.io-public-utilities`, then
    [`pagerduty`](../pagerduty/README.md) (same workflow): plan again, compare with
    the plan last posted on the merged PR, and apply only if they are the same.
 4. **If the plans differ** (most often a dashboard change after the PR was
@@ -273,10 +277,11 @@ must still match. A direct push to `main` applies nothing.
    cd bootstrap/github-actions && terraform init && terraform apply
    ```
 2. **Cloudflare API tokens** (dashboard → My Profile → API Tokens), scoped to the
-   *IPFS Public Utilities* account and the `inbrowser.link` / `inbrowser.dev` zones:
+   *IPFS Public Utilities* account and the `inbrowser.link` / `inbrowser.dev` /
+   `ipni.io` zones (the `ipni.io` in that account, not the one in *Alex@ipfs.io's Account*):
    - read-only for plans: Account Load Balancing: Monitors and Pools, Notifications,
      Cloudflare Pages; Zone, DNS, Load Balancers, Health Checks, Zone Settings,
-     Zone WAF, Cache Rules, Config Rules, SSL and Certificates: **Read**
+     Zone WAF, Cache Rules, Config Rules, Origin Rules, SSL and Certificates: **Read**
    - the same permissions with **Edit** for applies
 
    `ipni.io` is in a different account (*Alex@ipfs.io's Account*), so the
@@ -293,8 +298,10 @@ must still match. A direct push to `main` applies nothing.
      `CLOUDFLARE_IPNI_IO_API_TOKEN`: the `ipni.io` tokens from step 2
    - secrets `CLOUDFLARE_API_TOKEN_READ` (read-only token),
      `CLOUDFLARE_API_TOKEN` (edit token), `SWG_ALERTS_SLACK_WEBHOOK_URL`
-     (Slack incoming webhook), `RAINBOW_ORIGINS` and `SWG_ALERT_EMAILS`
-     (one-line JSON). Put every secret in the 1Password note too (see the
+     (Slack incoming webhook), `RAINBOW_ORIGINS`, `SWG_ALERT_EMAILS` and
+     `IPNI_IO_ADDRESSES` (one-line JSON; the last is
+     `{"<hostname>": ["<address>", ...]}` for every A record in
+     `ipni.io-public-utilities/dns.tf`). Put every secret in the 1Password note too (see the
      private values above): GitHub cannot show them again
 4. **Repository security settings**: branch protection on `main` (require a PR,
    no review, required checks `Terraform plan` and `gitleaks`, no force pushes
