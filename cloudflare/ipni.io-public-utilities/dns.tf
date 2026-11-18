@@ -118,14 +118,13 @@ resource "cloudflare_dns_record" "txt" {
   comment = local.managed_by
 }
 
-# The cidstats Pages project in this account (pages.tf). The old zone points
-# at the old project's cidstats.pages.dev; this one at the new project, which
-# only matters once this zone is live.
+# The cidstats Pages project: the old project's until the cutover, then the
+# one in this account (pages.tf).
 resource "cloudflare_dns_record" "cidstats" {
   zone_id = local.zone_id
   name    = "cidstats.ipni.io"
   type    = "CNAME"
-  content = cloudflare_pages_project.cidstats.subdomain
+  content = local.cidstats_cutover ? cloudflare_pages_project.cidstats[0].subdomain : "cidstats.pages.dev"
   proxied = true
   ttl     = 1
   comment = local.managed_by
