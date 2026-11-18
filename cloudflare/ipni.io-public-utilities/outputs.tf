@@ -9,8 +9,8 @@ output "status" {
 }
 
 output "cidstats_subdomain" {
-  description = "pages.dev hostname of the cidstats project in this account, the target of cidstats.ipni.io."
-  value       = cloudflare_pages_project.cidstats.subdomain
+  description = "pages.dev hostname of the cidstats project in this account (null until the cutover), the target of cidstats.ipni.io."
+  value       = one(cloudflare_pages_project.cidstats[*].subdomain)
 }
 
 output "name_servers" {
