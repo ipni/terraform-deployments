@@ -10,10 +10,16 @@ sha256() { if command -v sha256sum >/dev/null; then sha256sum; else shasum -a 25
 
 # An import shows as a no-op with .change.importing set: list it as "import"
 # (or e.g. "import,update"), or a PR that only imports would apply nothing.
+#
+# `permissions` is left out of the hash: on cloudflare_zone it lists what the
+# token running the plan may do, so a PR plan (read token) and the apply's
+# plan (edit token) always differ there, and an imported zone could never
+# apply. It is read-only, so leaving it out hides no change to Cloudflare.
 terraform show -json "$1" | jq -c '
   (.resource_changes[]?
    | select((.change.actions != ["no-op"] or .change.importing != null) and .change.actions != ["read"])
-   | {k: "\([if .change.importing != null then "import" else empty end] + (.change.actions - ["no-op"]) | join(",")) \(.address)", v: .change.after}),
+   | {k: "\([if .change.importing != null then "import" else empty end] + (.change.actions - ["no-op"]) | join(",")) \(.address)",
+      v: (.change.after | if type == "object" then del(.permissions) else . end)}),
   ((.output_changes // {}) | to_entries[]
    | select(.value.actions != ["no-op"])
    | {k: "\(.value.actions | join(",")) output.\(.key)", v: .value.after})' |
