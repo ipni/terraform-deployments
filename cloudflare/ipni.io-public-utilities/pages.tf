@@ -29,17 +29,15 @@ locals {
   }
 }
 
+# Provider 5.26.0 bug: its create and update responses don't match the
+# build_config sent (a sensitive attribute inside it), which fails the apply as an
+# "inconsistent result" (the create left the project tainted, untainted by hand).
+# build_config is left out: the site is static files from the repo root with no
+# build step, Pages' default, so there's nothing to set.
 resource "cloudflare_pages_project" "cidstats" {
   account_id        = local.account_id
   name              = "ipni-cidstats"
   production_branch = "main"
-
-  # Static files from the repo root, no build step.
-  build_config = {
-    build_command   = ""
-    destination_dir = ""
-    root_dir        = ""
-  }
 
   deployment_configs = {
     preview    = local.cidstats_deployment_config
