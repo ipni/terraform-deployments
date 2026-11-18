@@ -123,7 +123,8 @@ jobs:
           else
             files=$(git diff --name-only "$BASE" "$GITHUB_SHA")
             wanted=""
-            if grep -q '^\.github/workflows/terraform-cloudflare\.yml$' <<<"$files"; then wanted="$STACK_ORDER"; fi
+            # The workflow and its scripts (e.g. the plan comparison) affect every stack.
+            if grep -qE '^\.github/(workflows/terraform-cloudflare\.yml|scripts/)' <<<"$files"; then wanted="$STACK_ORDER"; fi
             if grep -q '^cloudflare/modules/' <<<"$files"; then wanted+=" inbrowser.link inbrowser.dev"; fi
             for s in $STACK_ORDER; do
               [[ "$s" == pagerduty ]] && dir=pagerduty || dir="cloudflare/$s"

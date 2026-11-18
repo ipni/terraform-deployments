@@ -35,13 +35,6 @@ resource "cloudflare_zone" "ipni_io" {
   }
 }
 
-# The plan is a billing change, made by a Super Administrator of the account
-# in the dashboard (Overview > Active Subscriptions > Change): the CI tokens
-# have no billing access. `plan` is read-only here, so the change shows up as
-# no drift; this check only warns on every plan until it is done.
-check "enterprise_plan" {
-  assert {
-    condition     = cloudflare_zone.ipni_io.plan.legacy_id == "enterprise"
-    error_message = "ipni.io is on the ${cloudflare_zone.ipni_io.plan.name} plan, not Enterprise. A Super Administrator of IPFS Public Utilities changes it in the dashboard."
-  }
-}
+# ipni.io stays on the Free plan. A plan change is a billing action, made by a
+# Super Administrator in the dashboard (the CI tokens have no billing access),
+# and is not managed here: `plan` is read-only, so it shows up as no drift.
