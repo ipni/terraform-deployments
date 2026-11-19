@@ -117,10 +117,13 @@ resource "cloudflare_dns_record" "filecoin_redirect" {
   zone_id = local.zone_id
   name    = each.key
   type    = "CNAME"
-  content = local.filecoin_redirect_cutover ? cloudflare_pages_project.filecoin_redirect[0].subdomain : "filecoin-redirect.pages.dev"
+  content = local.filecoin_redirect_cutover ? cloudflare_pages_project.filecoin_redirect.subdomain : "filecoin-redirect.pages.dev"
   proxied = true
   ttl     = 1
   comment = local.managed_by
+
+  # Add the custom domains to the new project before sending traffic to it.
+  depends_on = [cloudflare_pages_domain.filecoin_redirect]
 }
 
 # A hostname in the secret that has no record here would be silently ignored.
