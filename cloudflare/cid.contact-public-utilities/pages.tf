@@ -20,7 +20,7 @@
 #      delete the old project.
 
 locals {
-  filecoin_redirect_cutover = false
+  filecoin_redirect_cutover = true
 
   filecoin_redirect_hostnames = ["direct.cid.contact", "fetch.cid.contact"]
 
