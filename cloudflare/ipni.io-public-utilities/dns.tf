@@ -4,9 +4,9 @@
 locals {
   # Which hostnames exist and how they are served is public; their addresses
   # come from var.ipni_io_addresses. `count` is how many A records the name has.
+  # ipni.io and www.ipni.io have no records: they pointed at the old Grafana VM
+  # (grafana.ipni.io), shut down on 2026-10-26, and served nothing since.
   a_records = {
-    "ipni.io"                     = { proxied = true }
-    "www.ipni.io"                 = { proxied = true }
     "pin.ipni.io"                 = { proxied = false, count = 3 }
     "drand.ipni.io"               = { proxied = false, ttl = 300 }
     "route-chic-1.ipni.io"        = { proxied = true }
