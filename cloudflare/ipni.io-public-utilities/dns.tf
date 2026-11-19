@@ -1,7 +1,5 @@
 # Every DNS record of ipni.io, mirrored from the zone in Alex@ipfs.io's Account
-# (where the monitoring records are managed by ../ipni.io and the rest by
-# hand). Until the registrar transfer, a change to a record there must be made
-# here too.
+# before the move.
 
 locals {
   # Which hostnames exist and how they are served is public; their addresses

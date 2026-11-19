@@ -66,7 +66,7 @@ Each folder under `cloudflare/` is its own stack with its own state in
 3. `notifications`: alerts; reads the pool IDs. It runs last so it can also
    use IDs the zones create (e.g. health checks).
 
-`ipni.io`, `ipni.io-public-utilities`, `cid.contact-public-utilities` and
+`ipni.io-public-utilities`, `cid.contact-public-utilities` and
 `pagerduty` (in `pagerduty/`, state key `pagerduty/terraform.tfstate`) depend on
 none of them and run after.
 
