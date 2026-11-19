@@ -83,10 +83,12 @@ resource "cloudflare_pages_project" "filecoin_redirect" {
       # Owned by wrangler.toml in ipni/filecoin-redirect: each deployment
       # writes them, so a change there is not drift here.
       deployment_configs.preview.compatibility_date,
+      deployment_configs.preview.compatibility_flags,
       deployment_configs.preview.env_vars,
       deployment_configs.preview.placement,
       deployment_configs.preview.wrangler_config_hash,
       deployment_configs.production.compatibility_date,
+      deployment_configs.production.compatibility_flags,
       deployment_configs.production.env_vars,
       deployment_configs.production.placement,
       deployment_configs.production.wrangler_config_hash,
