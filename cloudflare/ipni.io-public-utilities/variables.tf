@@ -8,3 +8,16 @@ variable "ipni_io_addresses" {
   type        = map(list(string))
   sensitive   = true
 }
+
+variable "ipni_io_aop_client_key" {
+  description = "PEM private key of origin-pull-client.crt (zone-level Authenticated Origin Pulls). From the IPNI_IO_AOP_CLIENT_KEY secret; locally from a git-ignored secrets.auto.tfvars."
+  type        = string
+  sensitive   = true
+
+  # A missing GitHub secret arrives as an empty string, which would plan fine
+  # and only fail at apply.
+  validation {
+    condition     = can(regex("-----BEGIN [A-Z ]*PRIVATE KEY-----", var.ipni_io_aop_client_key))
+    error_message = "ipni_io_aop_client_key is not a PEM private key: set the IPNI_IO_AOP_CLIENT_KEY secret (cloudflare/README.md, repository settings)."
+  }
+}
