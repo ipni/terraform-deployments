@@ -1,14 +1,10 @@
-# ipni.io in the Cloudflare account "IPFS Public Utilities", where the zone is
-# moving from "Alex@ipfs.io's Account" (still managed in ../ipni.io until the
-# move is done).
+# ipni.io in the Cloudflare account "IPFS Public Utilities", moved from
+# "Alex@ipfs.io's Account". ipni.io is registered with Cloudflare Registrar, so
+# the move was Cloudflare's inter-account registrar transfer. The zone's DNS
+# records, rules and settings were mirrored here first, so nothing went missing.
 #
 # The zone was added by hand in the dashboard and is imported below: the CI
-# tokens are scoped to single zones, so they cannot create one. It stays
-# Pending and serves nothing until the domain moves here. ipni.io is
-# registered with Cloudflare Registrar, so the move is Cloudflare's
-# inter-account registrar transfer, started from the old account, not a
-# nameserver change. The zone's DNS records, rules and settings come here
-# before that transfer, so nothing goes missing when it lands.
+# tokens are scoped to single zones, so they cannot create one.
 
 locals {
   # Cloudflare account "IPFS Public Utilities" (shared with other IPFS services).
