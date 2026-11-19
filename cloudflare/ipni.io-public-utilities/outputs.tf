@@ -4,12 +4,12 @@ output "zone_id" {
 }
 
 output "status" {
-  description = "Zone status: pending until the registration moves to this account, then active."
+  description = "Zone status: active since ipni.io moved to this account."
   value       = cloudflare_zone.ipni_io.status
 }
 
 output "cidstats_subdomain" {
-  description = "pages.dev hostname of the cidstats project in this account, the target of cidstats.ipni.io after the cutover."
+  description = "pages.dev hostname of the cidstats project in this account, the target of cidstats.ipni.io."
   value       = cloudflare_pages_project.cidstats.subdomain
 }
 

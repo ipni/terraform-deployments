@@ -1,4 +1,4 @@
-# The zone's Origin and Configuration Rules, mirrored from ../ipni.io.
+# The zone's Origin and Configuration Rules, mirrored from the old zone.
 
 locals {
   # Proxied monitoring hostnames: Cloudflare sends them to Traefik on 8443.

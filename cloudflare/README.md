@@ -9,8 +9,7 @@ Terraform for IPNI-owned config in the shared Cloudflare account
 | `inbrowser.dev/` | Staging Service Worker Gateway zone |
 | `load-balancing/` | Account-level load balancer pools and health monitors used by both zones |
 | `notifications/` | Cloudflare Notifications (alerts) for the gateway, sent to Slack and email |
-| `ipni.io/` | The parts of the `ipni.io` zone managed here: the IPNI monitoring hostnames ([ipni/infra](https://github.com/ipni/infra), `docs/03-monitoring.md`), and the zone's Origin and Configuration Rules |
-| `ipni.io-public-utilities/` | The `ipni.io` zone in *IPFS Public Utilities*, where it is moving from *Alex@ipfs.io's Account*: the zone, every DNS record, its Origin and Configuration Rules and changed settings, and the `ipni-cidstats` Pages project that replaces `cidstats` (cutover in `pages.tf`), mirrored from the old account. Pending until the registration moves; until then, change a record in both places |
+| `ipni.io-public-utilities/` | The `ipni.io` zone in *IPFS Public Utilities*, moved from *Alex@ipfs.io's Account*: the zone, every DNS record (including the IPNI monitoring hostnames, see [ipni/infra](https://github.com/ipni/infra) `docs/03-monitoring.md`), its Origin and Configuration Rules and changed settings, and the `ipni-cidstats` Pages project (the `cidstats` site) |
 | `cid.contact-public-utilities/` | The `cid.contact` zone in *IPFS Public Utilities*, where it is moving from *Alex@ipfs.io's Account*: the zone, every DNS record, its changed settings, and the `filecoin-redirect` Pages project (created at the cutover, see `pages.tf`), mirrored from the old account. Pending until the nameservers at Squarespace change; until then, change a record in both places |
 | `modules/swg-zone/` | Shared zone config: DNS, zone settings, rulesets, load balancers, Pages custom domain, health check |
 | `scripts/export.sh` | Read-only export of a live zone into `scripts/generated/` (git-ignored) |
@@ -23,11 +22,6 @@ Terraform for IPNI-owned config in the shared Cloudflare account
 - **Other load balancer monitors and pools in the account** (needle, someguy,
   p2p-forge, ...). They belong to other services.
 - **Cloudflare-managed rulesets** (OWASP, DDoS, managed WAF).
-- **The rest of the `ipni.io` zone** (`route-*`, `*.bootstrap`, `pin`, ...),
-  still managed by hand for [ipni/workers](https://github.com/ipni/workers).
-  The zone's Configuration Rules are the exception: `ipni.io/` manages that
-  ruleset whole, including the `route-*` Full (strict) rule, so change them
-  there.
 
 ## Usage
 
@@ -241,7 +235,7 @@ Merge:  gitleaks -> changes -> to-apply -> apply (waits for a code owner)
    changes", the apply is skipped and there is nothing to approve (a dashboard
    change made since the PR was planned is then caught by the nightly drift
    check). Then, for each affected stack, in the order `load-balancing`,
-   `inbrowser.link`, `inbrowser.dev`, `notifications`, `ipni.io`,
+   `inbrowser.link`, `inbrowser.dev`, `notifications`,
    `ipni.io-public-utilities`, `cid.contact-public-utilities`, then
    [`pagerduty`](../pagerduty/README.md) (same workflow): plan again, compare with
    the plan last posted on the merged PR, and apply only if they are the same.
@@ -281,16 +275,11 @@ must still match. A direct push to `main` applies nothing.
    ```
 2. **Cloudflare API tokens** (dashboard → My Profile → API Tokens), scoped to the
    *IPFS Public Utilities* account and the `inbrowser.link` / `inbrowser.dev` /
-   `ipni.io` / `cid.contact` zones (the `ipni.io` and `cid.contact` in that
-   account, not the ones in *Alex@ipfs.io's Account*):
+   `ipni.io` / `cid.contact` zones:
    - read-only for plans: Account Load Balancing: Monitors and Pools, Notifications,
      Cloudflare Pages; Zone, DNS, Load Balancers, Health Checks, Zone Settings,
      Zone WAF, Cache Rules, Config Rules, Origin Rules, SSL and Certificates: **Read**
    - the same permissions with **Edit** for applies
-
-   `ipni.io` is in a different account (*Alex@ipfs.io's Account*), so the
-   `ipni.io/` stack has its own pair, scoped to that zone: Zone, DNS, Config
-   Rules, Origin Rules: **Read** for plans, **Edit** for applies.
 3. **Repository settings** (Settings → Secrets and variables → Actions):
    - secrets `AWS_ROLE_TERRAFORM_CLOUDFLARE_PLAN` and
      `AWS_ROLE_TERRAFORM_CLOUDFLARE_APPLY`: the role ARNs output in step 1
@@ -298,8 +287,6 @@ must still match. A direct push to `main` applies nothing.
      public logs)
    - variable `TERRAFORM_APPROVERS`: who can approve applies, space separated
      (`TakGN byo nymd`)
-   - secrets `CLOUDFLARE_IPNI_IO_API_TOKEN_READ` and
-     `CLOUDFLARE_IPNI_IO_API_TOKEN`: the `ipni.io` tokens from step 2
    - secrets `CLOUDFLARE_API_TOKEN_READ` (read-only token),
      `CLOUDFLARE_API_TOKEN` (edit token), `SWG_ALERTS_SLACK_WEBHOOK_URL`
      (Slack incoming webhook), `RAINBOW_ORIGINS`, `SWG_ALERT_EMAILS`,

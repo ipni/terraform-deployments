@@ -1,20 +1,15 @@
-# The cidstats site (github.com/ipni/cidstats), moving from the Pages project
-# "cidstats" in Alex@ipfs.io's Account. Project settings only: Pages builds and
-# deploys the site itself on every push to the repo.
+# The cidstats site (github.com/ipni/cidstats), on cidstats.ipni.io. Moved from
+# the Pages project "cidstats" in Alex@ipfs.io's Account. Project settings
+# only: Pages builds and deploys the site itself on every push to the repo.
 #
 # A GitHub repository can only be connected to Pages projects in one Cloudflare
-# account (error 8000093 otherwise). The repository was disconnected from the
-# old project, which keeps serving its last deployment on cidstats.pages.dev
-# and cidstats.ipni.io. This project gets its own name, so it doesn't depend on
-# Cloudflare freeing "cidstats".
-#
-# In two steps, so cidstats.ipni.io keeps working:
-#   1. this project is created and builds from the repo, on
-#      ipni-cidstats.pages.dev (cidstats_cutover = false);
-#   2. after the registrar transfer, set cidstats_cutover to true: this adds
-#      cidstats.ipni.io as its custom domain, then points the CNAME at it
-#      (dns.tf). If Cloudflare refuses the domain as in use, remove it from the
-#      old project first. Then delete the old project.
+# account (error 8000093 otherwise), so the repository was disconnected from
+# the old project first; that project kept serving its last deployment. This
+# project has its own name, so it didn't depend on Cloudflare freeing
+# "cidstats". It was created first, then cidstats.ipni.io was moved to it after
+# the registrar transfer by setting cidstats_cutover to true, which adds the
+# custom domain and points the CNAME at it (dns.tf). cidstats_cutover stays as
+# a switch so the resource addresses don't change.
 
 locals {
   cidstats_cutover = true
