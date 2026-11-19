@@ -41,25 +41,21 @@ locals {
   }
 }
 
-# Provider 5.26.0 to 5.29.0 bug: the create and update responses don't match the
-# build_config sent (a sensitive attribute inside it), which fails the apply as
-# an "inconsistent result" and leaves a new project tainted (see ipni-cidstats
-# in ../ipni.io-public-utilities). Expect the create to fail that way: the
-# project exists all the same, and is untainted by hand. build_config is
-# needed here (the Functions build fails without `npm ci`), so it is sent on
-# create and ignored afterwards, below, so later updates don't hit the bug.
+# Provider 5.26.0 to 5.29.0 bug: the create and update responses don't match
+# what was sent for sensitive attributes (build_config's web_analytics_token,
+# the env_vars values), which fails the apply as an "inconsistent result". The
+# create (#64) failed that way and left the project tainted, untainted by hand.
+#
+# build_config is left out, as for ipni-cidstats: kept in the code, even
+# ignored, the provider plans its unset members as unknown, an update on every
+# plan. #64 created the project with build command `npm ci` and output
+# directory `public` (the Functions build fails without `npm ci`, and it can't
+# be set in wrangler.toml); add them back here if the project is ever
+# recreated.
 resource "cloudflare_pages_project" "filecoin_redirect" {
   account_id        = local.account_id
   name              = "ipni-filecoin-redirect"
   production_branch = "main"
-
-  # The output directory also comes from wrangler.toml; the build command
-  # cannot (see the repo's README).
-  build_config = {
-    build_command   = "npm ci"
-    destination_dir = "public"
-    root_dir        = ""
-  }
 
   deployment_configs = {
     preview    = local.filecoin_redirect_deployment_config
@@ -84,15 +80,15 @@ resource "cloudflare_pages_project" "filecoin_redirect" {
 
   lifecycle {
     ignore_changes = [
-      # The provider bug above.
-      build_config,
       # Owned by wrangler.toml in ipni/filecoin-redirect: each deployment
       # writes them, so a change there is not drift here.
       deployment_configs.preview.compatibility_date,
       deployment_configs.preview.env_vars,
+      deployment_configs.preview.placement,
       deployment_configs.preview.wrangler_config_hash,
       deployment_configs.production.compatibility_date,
       deployment_configs.production.env_vars,
+      deployment_configs.production.placement,
       deployment_configs.production.wrangler_config_hash,
     ]
   }
