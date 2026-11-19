@@ -1,23 +1,23 @@
 # filecoin-redirect (github.com/ipni/filecoin-redirect), the redirect service
-# on direct.cid.contact and fetch.cid.contact, mirrored from the Pages project
-# of the same name in Alex@ipfs.io's Account. Project settings only: Pages
+# on direct.cid.contact and fetch.cid.contact, moving from the Pages project
+# "filecoin-redirect" in Alex@ipfs.io's Account. Project settings only: Pages
 # builds and deploys the site itself on every push to the repo.
 #
-# Not created until the cutover. A GitHub repository can only be connected to
-# Pages projects in one Cloudflare account, so Cloudflare refuses this project
-# (error 8000093) while the old one exists. A project without the repository
-# is no way around it: a direct-upload project can't be connected to Git later.
+# A GitHub repository can only be connected to Pages projects in one Cloudflare
+# account (error 8000093 otherwise). The repository was disconnected from the
+# old project, which keeps serving its last deployment on
+# filecoin-redirect.pages.dev, direct.cid.contact and fetch.cid.contact. This
+# project gets its own name, so it doesn't depend on Cloudflare freeing
+# "filecoin-redirect".
 #
-# Until then, direct. and fetch.cid.contact point at the old project's
-# filecoin-redirect.pages.dev, as in the old zone. At the cutover, after the
-# nameserver change:
-#   1. delete the old project in Alex@ipfs.io's Account (direct. and
-#      fetch.cid.contact are down until step 2 is applied);
-#   2. set filecoin_redirect_cutover to true: this creates the project,
-#      connected to the repository, with both hostnames as its custom domains,
-#      and points the CNAMEs at it. Its pages.dev name is
-#      filecoin-redirect.pages.dev again if Cloudflare has freed it, else a
-#      generated one.
+# In two steps, so direct. and fetch.cid.contact keep working:
+#   1. this project is created and builds from the repo, on
+#      ipni-filecoin-redirect.pages.dev (filecoin_redirect_cutover = false);
+#   2. once this zone is active (nameserver change at Squarespace), set
+#      filecoin_redirect_cutover to true: this adds both hostnames as its
+#      custom domains, then points the CNAMEs at it (dns.tf). If Cloudflare
+#      refuses a domain as in use, remove it from the old project first. Then
+#      delete the old project.
 
 locals {
   filecoin_redirect_cutover = false
@@ -41,15 +41,20 @@ locals {
   }
 }
 
+# Provider 5.26.0 to 5.29.0 bug: the create and update responses don't match the
+# build_config sent (a sensitive attribute inside it), which fails the apply as
+# an "inconsistent result" and leaves a new project tainted (see ipni-cidstats
+# in ../ipni.io-public-utilities). Expect the create to fail that way: the
+# project exists all the same, and is untainted by hand. build_config is
+# needed here (the Functions build fails without `npm ci`), so it is sent on
+# create and ignored afterwards, below, so later updates don't hit the bug.
 resource "cloudflare_pages_project" "filecoin_redirect" {
-  count = local.filecoin_redirect_cutover ? 1 : 0
-
   account_id        = local.account_id
-  name              = "filecoin-redirect"
+  name              = "ipni-filecoin-redirect"
   production_branch = "main"
 
   # The output directory also comes from wrangler.toml; the build command
-  # cannot, and without it the Functions build fails (see the repo's README).
+  # cannot (see the repo's README).
   build_config = {
     build_command   = "npm ci"
     destination_dir = "public"
@@ -78,9 +83,11 @@ resource "cloudflare_pages_project" "filecoin_redirect" {
   }
 
   lifecycle {
-    # Owned by wrangler.toml in ipni/filecoin-redirect: each deployment writes
-    # them, so a change there is not drift here.
     ignore_changes = [
+      # The provider bug above.
+      build_config,
+      # Owned by wrangler.toml in ipni/filecoin-redirect: each deployment
+      # writes them, so a change there is not drift here.
       deployment_configs.preview.compatibility_date,
       deployment_configs.preview.env_vars,
       deployment_configs.preview.wrangler_config_hash,
@@ -95,6 +102,6 @@ resource "cloudflare_pages_domain" "filecoin_redirect" {
   for_each = local.filecoin_redirect_cutover ? toset(local.filecoin_redirect_hostnames) : toset([])
 
   account_id   = local.account_id
-  project_name = cloudflare_pages_project.filecoin_redirect[0].name
+  project_name = cloudflare_pages_project.filecoin_redirect.name
   name         = each.key
 }
