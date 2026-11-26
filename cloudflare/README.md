@@ -9,7 +9,7 @@ Terraform for IPNI-owned config in the shared Cloudflare account
 | `inbrowser.dev/` | Staging Service Worker Gateway zone |
 | `load-balancing/` | Account-level load balancer pools and health monitors used by both zones |
 | `notifications/` | Cloudflare Notifications (alerts) for the gateway, sent to Slack and email |
-| `ipni.io-public-utilities/` | The `ipni.io` zone in *IPFS Public Utilities*, moved from *Alex@ipfs.io's Account*: the zone, every DNS record (including the IPNI monitoring hostnames, see [ipni/infra](https://github.com/ipni/infra) `docs/03-monitoring.md`), its Origin and Configuration Rules and changed settings, and the `ipni-cidstats` Pages project (the `cidstats` site) |
+| `ipni.io-public-utilities/` | The `ipni.io` zone in *IPFS Public Utilities*, moved from *Alex@ipfs.io's Account*: the zone, every DNS record (including the IPNI monitoring hostnames, see [ipni/infra](https://github.com/ipni/infra) `docs/03-monitoring.md`), its Origin and Configuration Rules and changed settings, its zone-level Authenticated Origin Pulls certificate (`aop.tf`), and the `ipni-cidstats` Pages project (the `cidstats` site) |
 | `cid.contact-public-utilities/` | The `cid.contact` zone in *IPFS Public Utilities*, where it is moving from *Alex@ipfs.io's Account*: the zone, every DNS record, its changed settings, and the `filecoin-redirect` Pages project (as `ipni-filecoin-redirect`; its custom domains move at the cutover, see `pages.tf`), mirrored from the old account. Pending until the nameservers at Squarespace change; until then, change a record in both places |
 | `modules/swg-zone/` | Shared zone config: DNS, zone settings, rulesets, load balancers, Pages custom domain, health check |
 | `scripts/export.sh` | Read-only export of a live zone into `scripts/generated/` (git-ignored) |
@@ -292,7 +292,10 @@ must still match. A direct push to `main` applies nothing.
      (Slack incoming webhook), `RAINBOW_ORIGINS`, `SWG_ALERT_EMAILS`,
      `IPNI_IO_ADDRESSES` and `CID_CONTACT_ADDRESSES` (one-line JSON; the last
      two are `{"<hostname>": ["<address>", ...]}` for every A record in
-     `ipni.io-public-utilities/dns.tf` and `cid.contact-public-utilities/dns.tf`). Put every secret in the 1Password note too (see the
+     `ipni.io-public-utilities/dns.tf` and `cid.contact-public-utilities/dns.tf`), and `IPNI_IO_AOP_CLIENT_KEY` (the PEM
+     key of `ipni.io-public-utilities/origin-pull-client.crt`,
+     `vault_origin_pull_client_key` in ipni/workers' vault; the workflow gives
+     it to the `ipni.io-public-utilities` stack only). Put every secret in the 1Password note too (see the
      private values above): GitHub cannot show them again
 4. **Repository security settings**: branch protection on `main` (require a PR,
    no review, required checks `Terraform plan` and `gitleaks`, no force pushes

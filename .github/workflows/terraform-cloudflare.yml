@@ -166,6 +166,9 @@ jobs:
       TF_VAR_pagerduty_id: ${{ vars.CLOUDFLARE_PAGERDUTY_ID }}
       TF_VAR_ipni_io_addresses: ${{ secrets.IPNI_IO_ADDRESSES }}
       TF_VAR_cid_contact_addresses: ${{ secrets.CID_CONTACT_ADDRESSES }}
+      # Client key for ipni.io's Authenticated Origin Pulls certificate, only
+      # for the ipni.io-public-utilities stack.
+      TF_VAR_ipni_io_aop_client_key: ${{ matrix.stack == 'ipni.io-public-utilities' && secrets.IPNI_IO_AOP_CLIENT_KEY || '' }}
       # Read-only PagerDuty API key, and the members (names, emails) only for
       # the pagerduty stack.
       PAGERDUTY_TOKEN: ${{ matrix.stack == 'pagerduty' && secrets.PAGERDUTY_TOKEN_READ || '' }}
@@ -388,6 +391,9 @@ jobs:
       TF_VAR_pagerduty_id: ${{ vars.CLOUDFLARE_PAGERDUTY_ID }}
       TF_VAR_ipni_io_addresses: ${{ secrets.IPNI_IO_ADDRESSES }}
       TF_VAR_cid_contact_addresses: ${{ secrets.CID_CONTACT_ADDRESSES }}
+      # Client key for ipni.io's Authenticated Origin Pulls certificate. Not a
+      # TF_VAR_: the loop below exports it for ipni.io-public-utilities only.
+      IPNI_IO_AOP_CLIENT_KEY: ${{ secrets.IPNI_IO_AOP_CLIENT_KEY }}
       GH_TOKEN: ${{ github.token }}
       STACKS: ${{ needs.changes.outputs.stacks }}
     steps:
@@ -445,6 +451,11 @@ jobs:
           set -euo pipefail
           results="$RUNNER_TEMP/results.txt"
           for stack in $(jq -r '.[]' <<<"$STACKS"); do
+            if [[ "$stack" == ipni.io-public-utilities ]]; then
+              export TF_VAR_ipni_io_aop_client_key="$IPNI_IO_AOP_CLIENT_KEY"
+            else
+              unset TF_VAR_ipni_io_aop_client_key
+            fi
             echo "::group::$stack"
             echo "STACK $stack" >> "$results"
             [[ "$stack" == pagerduty ]] && dir=pagerduty || dir="cloudflare/$stack"
