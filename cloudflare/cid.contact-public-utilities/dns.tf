@@ -12,6 +12,9 @@ locals {
     "chic1.cid.contact"        = { proxied = false }
     "find.chic1.cid.contact"   = { proxied = false }
     "ingest.chic1.cid.contact" = { proxied = false }
+    "amst1.cid.contact"        = { proxied = false }
+    "find.amst1.cid.contact"   = { proxied = false }
+    "ingest.amst1.cid.contact" = { proxied = false }
 
     # Copied as is: it points at Cloudflare's own addresses, so it answers
     # 403 and serves nothing today.
